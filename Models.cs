@@ -12,6 +12,8 @@ public class AppSettings
     public bool NotifyOnShiftComplete { get; set; } = true;
     public bool Warn5Min { get; set; } = true;
     public bool Warn15Min { get; set; } = true;
+    public string AiProvider { get; set; } = "None";
+    public string AiApiKey { get; set; } = string.Empty;
 }
 
 public class ShiftDataFile

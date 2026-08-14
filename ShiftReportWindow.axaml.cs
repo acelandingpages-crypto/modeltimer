@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace ModelTimer;
 
@@ -14,6 +15,7 @@ public partial class ShiftReportWindow : Window
 {
     private readonly string _model;
     private readonly string _moderator;
+    private readonly TimeSpan _elapsed;
     private readonly string _dataFilePath;
     private bool _submitted;
 
@@ -23,6 +25,7 @@ public partial class ShiftReportWindow : Window
 
         _model = model;
         _moderator = moderator;
+        _elapsed = elapsed;
         _dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
 
         RecapText.Text = $"Model: {model}  |  Moderator: {moderator}  |  Worked: {elapsed:hh\\:mm\\:ss}";
@@ -86,9 +89,41 @@ public partial class ShiftReportWindow : Window
 
     private void ShowSaveFailedWarning()
     {
+        ShowInfoDialog("Save Failed", "Couldn't save the shift report to disk. Please note it down manually, then try Submit again.");
+    }
+
+    private async void BtnDraftAi_Click(object sender, RoutedEventArgs e)
+    {
+        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+
+        if (!AiSummaryService.IsConfigured(settings))
+        {
+            ShowInfoDialog("AI Drafting Not Set Up", "Add a provider and API key under Settings to enable AI-drafted summaries. For now, write this one yourself.");
+            return;
+        }
+
+        try
+        {
+            BtnDraftAi.IsEnabled = false;
+            var draft = await AiSummaryService.DraftSummaryAsync(settings!, _model, _moderator, _elapsed);
+            SummaryTextBox.Text = draft;
+        }
+        catch (Exception ex)
+        {
+            ShowInfoDialog("AI Drafting Unavailable", ex.Message);
+        }
+        finally
+        {
+            BtnDraftAi.IsEnabled = true;
+        }
+    }
+
+    private void ShowInfoDialog(string title, string message)
+    {
         var dialog = new Window
         {
-            Title = "Save Failed",
+            Title = title,
             Width = 380,
             Height = 190,
             Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
@@ -99,7 +134,7 @@ public partial class ShiftReportWindow : Window
         var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
         panel.Children.Add(new TextBlock
         {
-            Text = "Couldn't save the shift report to disk. Please note it down manually, then try Submit again.",
+            Text = message,
             Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap

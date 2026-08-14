@@ -4,9 +4,9 @@
         x:Class="ModelTimer.SettingsWindow"
         Title="Settings"
         Width="400"
-        Height="520"
+        Height="680"
         MinWidth="400"
-        MinHeight="520"
+        MinHeight="680"
         Background="#FF1E1E1E"
         WindowStartupLocation="CenterOwner"
         WindowDecorations="None"
@@ -62,11 +62,31 @@
           </StackPanel>
         </Border>
 
-        <!-- Row 5: Reset to defaults -->
-        <Button Grid.Row="5" Name="BtnResetDefaults" Content="Reset to defaults" Height="32" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnResetDefaults_Click" Margin="0,15,0,0"/>
+        <!-- Row 5: AI summary drafting (optional, not yet wired to a provider) -->
+        <Border Grid.Row="5" Name="AiBorder" Padding="15" CornerRadius="6" Margin="0,10,0,0">
+          <StackPanel Spacing="10">
+            <TextBlock Name="AiSectionLabel" Text="AI Summary Drafting (optional)" Foreground="White" FontSize="13" FontWeight="Bold"/>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+              <TextBlock Grid.Column="0" Name="AiProviderLabel" Text="Provider" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="90"/>
+              <ComboBox Grid.Column="1" Name="AiProviderComboBox" VerticalAlignment="Center" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" Height="30" SelectedIndex="0">
+                <ComboBoxItem Content="None"/>
+                <ComboBoxItem Content="Anthropic Claude"/>
+                <ComboBoxItem Content="OpenAI"/>
+              </ComboBox>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+              <TextBlock Grid.Column="0" Name="AiApiKeyLabel" Text="API key" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="90"/>
+              <TextBox Grid.Column="1" Name="AiApiKeyBox" PasswordChar="*" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30"/>
+            </Grid>
+            <TextBlock Name="AiHintText" Text="Not wired up to a provider yet — this just stores the key for when AI drafting is enabled." Foreground="#FF888888" FontSize="11" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
 
-        <!-- Row 6: Cancel and Save -->
-        <Grid Grid.Row="6" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,15,0,0">
+        <!-- Row 6: Reset to defaults -->
+        <Button Grid.Row="6" Name="BtnResetDefaults" Content="Reset to defaults" Height="32" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnResetDefaults_Click" Margin="0,15,0,0"/>
+
+        <!-- Row 7: Cancel and Save -->
+        <Grid Grid.Row="7" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,15,0,0">
           <Button Grid.Column="0" Name="BtnCancel" Content="Cancel" Height="32" Background="#FFFF0000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnCancel_Click"/>
           <Button Grid.Column="1" Name="BtnSave" Content="Save" Height="32" Background="#FFa6e3a1" Foreground="Black" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnSave_Click"/>
         </Grid>

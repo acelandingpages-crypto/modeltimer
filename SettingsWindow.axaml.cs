@@ -18,6 +18,8 @@ public partial class SettingsWindow : Window
     public bool NotifyOnShiftComplete { get; private set; } = true;
     public bool Warn5Min { get; private set; } = true;
     public bool Warn15Min { get; private set; } = true;
+    public string AiProvider { get; private set; } = "None";
+    public string AiApiKey { get; private set; } = string.Empty;
     public bool Confirmed { get; private set; }
 
     private string _dataFilePath = string.Empty;
@@ -79,6 +81,15 @@ public partial class SettingsWindow : Window
         ChkNotifyOnShiftComplete.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         ChkWarn5Min.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         ChkWarn15Min.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiBorder.Background = new SolidColorBrush(Color.Parse(bgSurface));
+        AiSectionLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiProviderLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiApiKeyLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiProviderComboBox.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        AiProviderComboBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiApiKeyBox.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        AiApiKeyBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        AiHintText.Foreground = new SolidColorBrush(Color.Parse(fgMuted));
         BtnCancel.Background = new SolidColorBrush(Color.Parse("#FFFF0000"));
         BtnCancel.Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF"));
         BtnSave.Background = new SolidColorBrush(Color.Parse("#FFa6e3a1"));
@@ -107,6 +118,8 @@ public partial class SettingsWindow : Window
             NotifyOnShiftComplete = settings.NotifyOnShiftComplete;
             Warn5Min = settings.Warn5Min;
             Warn15Min = settings.Warn15Min;
+            AiProvider = settings.AiProvider;
+            AiApiKey = settings.AiApiKey;
         }
 
         ThemeComboBox.SelectedItem = SelectedTheme == "Light" ? ThemeComboBox.Items[0] : ThemeComboBox.Items[1];
@@ -116,6 +129,13 @@ public partial class SettingsWindow : Window
         ChkNotifyOnShiftComplete.IsChecked = NotifyOnShiftComplete;
         ChkWarn5Min.IsChecked = Warn5Min;
         ChkWarn15Min.IsChecked = Warn15Min;
+        AiProviderComboBox.SelectedIndex = AiProvider switch
+        {
+            "Anthropic Claude" => 1,
+            "OpenAI" => 2,
+            _ => 0
+        };
+        AiApiKeyBox.Text = AiApiKey;
     }
 
     private void SaveSettings()
@@ -128,7 +148,9 @@ public partial class SettingsWindow : Window
             TypingHotkey = TypingHotkeyBox.Text ?? "ctrl + k",
             NotifyOnShiftComplete = ChkNotifyOnShiftComplete.IsChecked ?? false,
             Warn5Min = ChkWarn5Min.IsChecked ?? false,
-            Warn15Min = ChkWarn15Min.IsChecked ?? false
+            Warn15Min = ChkWarn15Min.IsChecked ?? false,
+            AiProvider = AiProviderComboBox.SelectedItem is ComboBoxItem aiItem ? aiItem.Content?.ToString() ?? "None" : "None",
+            AiApiKey = AiApiKeyBox.Text ?? string.Empty
         };
 
         JsonStore.Save(_dataFilePath, settings);
@@ -143,6 +165,8 @@ public partial class SettingsWindow : Window
         ChkNotifyOnShiftComplete.IsChecked = true;
         ChkWarn5Min.IsChecked = true;
         ChkWarn15Min.IsChecked = true;
+        AiProviderComboBox.SelectedIndex = 0;
+        AiApiKeyBox.Text = string.Empty;
     }
 
     private void BtnSave_Click(object sender, RoutedEventArgs e)
@@ -155,6 +179,8 @@ public partial class SettingsWindow : Window
         NotifyOnShiftComplete = ChkNotifyOnShiftComplete.IsChecked ?? false;
         Warn5Min = ChkWarn5Min.IsChecked ?? false;
         Warn15Min = ChkWarn15Min.IsChecked ?? false;
+        AiProvider = AiProviderComboBox.SelectedItem is ComboBoxItem aiSaveItem ? aiSaveItem.Content?.ToString() ?? "None" : "None";
+        AiApiKey = AiApiKeyBox.Text ?? string.Empty;
         Confirmed = true;
         Close();
     }
