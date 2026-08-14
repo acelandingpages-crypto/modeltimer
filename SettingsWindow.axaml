@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
+        x:Class="ModelTimer.SettingsWindow"
+        Title="Settings"
+        Width="400"
+        Height="520"
+        MinWidth="400"
+        MinHeight="520"
+        Background="#FF1E1E1E"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,*" >
+    <!-- Draggable title bar -->
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Settings" Foreground="Black" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        <Button Grid.Column="1" Name="CloseButton" Width="30" Height="30" Background="#FFFF0000" Click="CloseButton_Click" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="X" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Main content -->
+    <Border Grid.Row="1" Name="ContentBorder" Padding="20,20,20,30" CornerRadius="0" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="3">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
+        <!-- Row 0: Theme -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="120"/>
+          <ComboBox Grid.Column="1" Name="ThemeComboBox" VerticalAlignment="Center" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" Height="30">
+            <ComboBoxItem Content="Light"/>
+            <ComboBoxItem Content="Dark"/>
+          </ComboBox>
+        </Grid>
+
+        <!-- Row 1: Show hotkey -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Name="ShowHotkeyLabel" Text="Show hotkey" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="120"/>
+          <TextBox Grid.Column="1" Name="ShowHotkeyBox" Text="ctrl + s" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" KeyDown="HotkeyBox_KeyDown"/>
+        </Grid>
+
+        <!-- Row 2: Private hotkey -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Name="PrivateHotkeyLabel" Text="Private hotkey" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="120"/>
+          <TextBox Grid.Column="1" Name="PrivateHotkeyBox" Text="ctrl + p" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" KeyDown="HotkeyBox_KeyDown"/>
+        </Grid>
+
+        <!-- Row 3: Typing hotkey -->
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Name="TypingHotkeyLabel" Text="Typing hotkey" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="120"/>
+          <TextBox Grid.Column="1" Name="TypingHotkeyBox" Text="ctrl + k" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus" KeyDown="HotkeyBox_KeyDown"/>
+        </Grid>
+
+        <!-- Row 4: Notification settings container -->
+        <Border Grid.Row="4" Name="NotifyBorder" Padding="15" CornerRadius="6" Margin="0,10,0,0">
+          <StackPanel Spacing="10">
+            <CheckBox Name="ChkNotifyOnShiftComplete" Content="Notify on shift complete" Foreground="White" FontSize="14" IsChecked="True"/>
+            <CheckBox Name="ChkWarn5Min" Content="Warn 5 min before end" Foreground="White" FontSize="14" IsChecked="True"/>
+            <CheckBox Name="ChkWarn15Min" Content="Warn 15 min before end" Foreground="White" FontSize="14" IsChecked="True"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Row 5: Reset to defaults -->
+        <Button Grid.Row="5" Name="BtnResetDefaults" Content="Reset to defaults" Height="32" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnResetDefaults_Click" Margin="0,15,0,0"/>
+
+        <!-- Row 6: Cancel and Save -->
+        <Grid Grid.Row="6" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,15,0,0">
+          <Button Grid.Column="0" Name="BtnCancel" Content="Cancel" Height="32" Background="#FFFF0000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnCancel_Click"/>
+          <Button Grid.Column="1" Name="BtnSave" Content="Save" Height="32" Background="#FFa6e3a1" Foreground="Black" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnSave_Click"/>
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

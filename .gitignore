@@ -1,0 +1,13 @@
+bin/
+obj/
+publish_single/
+
+# Runtime data files generated next to the app
+shift_data.json
+crm_data.json
+settings.json
+active_shift.json
+error_log.txt
+*.log
+activity_export.csv
+activity_export.tsv

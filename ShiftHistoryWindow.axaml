@@ -1,0 +1,44 @@
+  <Window xmlns="https://github.com/avaloniaui"
+          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+          x:Class="ModelTimer.ShiftHistoryWindow"
+          Title="Shift History"
+          Width="1100"
+          Height="700"
+          MinWidth="1100"
+          MinHeight="700"
+          Background="#FF1E1E1E"
+          WindowStartupLocation="CenterOwner"
+          WindowDecorations="None"
+          ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,50,*" >
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Shift History" Foreground="Black" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        <Button Grid.Column="1" Name="CloseButton" Width="30" Height="30" Background="#FFFF0000" Click="CloseButton_Click" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="X" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </Button>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Name="FilterBorder" Padding="10" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
+      <Grid ColumnDefinitions="*,*,*,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
+        <TextBox Grid.Column="0" Name="SearchBox" PlaceholderText="Filter by model or moderator..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30"/>
+        <DatePicker Grid.Column="1" Name="FromDatePicker" Background="#FF3E3E42" Foreground="White" Height="30"/>
+        <DatePicker Grid.Column="2" Name="ToDatePicker" Background="#FF3E3E42" Foreground="White" Height="30"/>
+        <Button Grid.Column="3" Name="BtnApply" Content="Apply" Height="30" MinWidth="35" Background="#FFa6e3a1" Foreground="Black" Click="BtnApply_Click"/>
+        <Button Grid.Column="4" Name="BtnRefresh" Content="Refresh" Height="30" MinWidth="35" Background="#FF3E3E42" Foreground="White" Click="BtnRefresh_Click"/>
+        <Button Grid.Column="5" Name="BtnClear" Content="Clear" Height="30" MinWidth="35" Background="#FFFF0000" Foreground="White" Click="BtnClear_Click"/>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="2" Name="DataBorder" Background="#FF1E1E1E">
+      <Grid RowDefinitions="*,Auto">
+        <ScrollViewer Grid.Row="0" Name="TableScrollViewer">
+          <Grid Name="TableGrid" ColumnDefinitions="40,130,110,110,80,100,120,*,80"/>
+        </ScrollViewer>
+        <TextBlock Grid.Row="1" Name="NoDataText" Text="No shift history found." Foreground="#FF888888" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0" IsVisible="False"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
+        x:Class="ModelTimer.ShiftReportWindow"
+        Title="Shift Report"
+        Width="460"
+        Height="660"
+        MinWidth="420"
+        MinHeight="520"
+        Background="#FF1E1E1E"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,*,Auto">
+    <!-- Draggable title bar -->
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
+      <TextBlock Text="Shift Report" Foreground="Black" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="20,15,20,15" Spacing="12">
+
+        <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
+          <TextBlock Name="RecapText" Text="" Foreground="#FFa6e3a1" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"/>
+        </Border>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Session summary (required)" Foreground="White" FontSize="14" FontWeight="Bold"/>
+          <TextBox Name="SummaryTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8"
+                    PlaceholderText="How did the shift go overall?" TextChanged="SummaryTextBox_TextChanged"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Good members / VIPs to note" Foreground="#FFa6e3a1" FontSize="14" FontWeight="Bold"/>
+          <TextBox Name="GoodMembersTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="55" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8"
+                    PlaceholderText="Fans worth prioritizing next shift"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Issues / members to watch" Foreground="#FFf9e2af" FontSize="14" FontWeight="Bold"/>
+          <TextBox Name="IssuesTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="55" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8"
+                    PlaceholderText="Anything the next moderator should watch for"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Model mood / performance" Foreground="White" FontSize="14" FontWeight="Bold"/>
+          <ComboBox Name="RatingComboBox" HorizontalAlignment="Stretch" Background="#FF3E3E42" Foreground="White" SelectedIndex="0">
+            <ComboBoxItem Content="Not rated"/>
+            <ComboBoxItem Content="1 - Rough"/>
+            <ComboBoxItem Content="2 - Okay"/>
+            <ComboBoxItem Content="3 - Good"/>
+            <ComboBoxItem Content="4 - Great"/>
+            <ComboBoxItem Content="5 - Amazing"/>
+          </ComboBox>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Row="2" Margin="20,0,20,20">
+      <Button Name="BtnSubmit" Content="Submit Report" Height="34" Background="#FFa6e3a1" Foreground="Black" IsEnabled="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnSubmit_Click"/>
+    </Grid>
+  </Grid>
+</Window>

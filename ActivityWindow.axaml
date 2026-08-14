@@ -1,0 +1,96 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
+        x:Class="ModelTimer.ActivityWindow"
+        Title="Activity"
+        Width="1000"
+        Height="700"
+        MinWidth="1000"
+        MinHeight="700"
+        Background="#FF1E1E1E"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,50,Auto,Auto,*" >
+    <!-- Title Bar -->
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Activity" Foreground="Black" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        <Button Grid.Column="1" Name="CloseButton" Width="30" Height="30" Background="#FFFF0000" Click="CloseButton_Click" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="X" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Row 1: Filter Bar -->
+    <Border Grid.Row="1" Name="FilterBorder" Padding="10" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
+        <TextBlock Grid.Column="0" Name="FromLabel" Text="From:" Foreground="White" VerticalAlignment="Center"/>
+        <DatePicker Grid.Column="1" Name="FromDatePicker" Background="#FF3E3E42" Foreground="White" Height="30" Width="50"/>
+        <TextBlock Grid.Column="2" Name="ToLabel" Text="To:" Foreground="White" VerticalAlignment="Center"/>
+        <DatePicker Grid.Column="3" Name="ToDatePicker" Background="#FF3E3E42" Foreground="White" Height="30" Width="50"/>
+        <TextBlock Grid.Column="4" Name="ModLabel" Text="Moderator:" Foreground="White" VerticalAlignment="Center"/>
+        <ComboBox Grid.Column="5" Name="ModeratorComboBox" Background="#FF3E3E42" Foreground="White" Height="30" Width="100"/>
+        <Button Grid.Column="6" Name="BtnClear" Content="Clear" Height="30" MinWidth="45" Background="#FFFF0000" Foreground="White" Click="BtnClear_Click"/>
+        <Button Grid.Column="7" Name="BtnRefresh" Content="Refresh" Height="30" MinWidth="45" Background="#FF3E3E42" Foreground="White" Click="BtnRefresh_Click"/>
+      </Grid>
+    </Border>
+
+    <!-- Row 2: Header & Actions -->
+    <Border Grid.Row="2" Padding="5,3,5,3" Background="#FF1E1E1E">
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Name="DashboardTitle" Text="Studio performance dashboard" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+        <TextBlock Grid.Row="0" Grid.Column="1" Name="TotalText" Text="Total: 0.00 hrs" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6" Margin="0,3,0,0">
+          <Button Name="BtnApply" Content="Apply" Height="30" Width="90" Background="#FFa6e3a1" Foreground="Black" Click="BtnApply_Click" VerticalAlignment="Center"/>
+          <Button Name="BtnExportCsv" Content="Export CSV" Height="30" Width="110" Background="#FF107C10" Foreground="White" Click="BtnExportCsv_Click" VerticalAlignment="Center"/>
+          <Button Name="BtnExportExcel" Content="Export Excel" Height="30" Width="120" Background="#FF0E639C" Foreground="White" Click="BtnExportExcel_Click" VerticalAlignment="Center"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Row 3: KPI Cards -->
+    <Border Grid.Row="3" Padding="4,2,4,2" Background="#FF1E1E1E">
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+        <Border Grid.Column="0" Background="#FF252526" Padding="6,3,6,3" CornerRadius="4" BorderBrush="#FFcba6f7" BorderThickness="1">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="Daily avg:" Foreground="#FF888888" FontSize="11" VerticalAlignment="Center"/>
+            <TextBlock Name="DailyAvgText" Text="0.00 hrs" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Background="#FF252526" Padding="6,3,6,3" CornerRadius="4" BorderBrush="#FFcba6f7" BorderThickness="1">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="Top performer:" Foreground="#FF888888" FontSize="11" VerticalAlignment="Center"/>
+            <TextBlock Name="TopPerformerText" Text="-" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Background="#FF252526" Padding="6,3,6,3" CornerRadius="4" BorderBrush="#FFcba6f7" BorderThickness="1">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="Days tracked:" Foreground="#FF888888" FontSize="11" VerticalAlignment="Center"/>
+            <TextBlock Name="DaysTrackedText" Text="0" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+
+    <!-- Row 4: Bar Chart -->
+    <Border Grid.Row="4" Padding="10" Background="#FF1E1E1E">
+      <Grid RowDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0" ColumnDefinitions="*">
+          <TextBlock Grid.Column="0" Name="ChartTitle" Text="Hours per day" Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+        </Grid>
+        <ScrollViewer Grid.Row="1" Name="ChartScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+          <Canvas Name="ChartCanvas" Background="#FF252526"/>
+        </ScrollViewer>
+        <TextBlock Grid.Row="1" Name="NoChartText" Text="No data to display" Foreground="#FF888888" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False"/>
+        <StackPanel Grid.Row="2" Name="LegendPanel" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,5,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Border Width="12" Height="2" Background="#FFcba6f7"/>
+            <TextBlock Text="Avg (average hrs/day)" Foreground="White" VerticalAlignment="Center"/>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
+        x:Class="ModelTimer.PreShiftConfirmWindow"
+        Title="Pre-Shift Check"
+        Width="460"
+        Height="640"
+        MinWidth="420"
+        MinHeight="480"
+        Background="#FF1E1E1E"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,*,Auto">
+    <!-- Draggable title bar -->
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
+      <TextBlock Text="Pre-Shift Check" Foreground="Black" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="20,15,20,15" Spacing="12">
+
+        <!-- Recap -->
+        <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
+          <StackPanel Spacing="4">
+            <TextBlock Name="RecapModelText" Text="Model: -" Foreground="#FFa6e3a1" FontSize="15" FontWeight="Bold"/>
+            <TextBlock Name="RecapModeratorText" Text="Moderator: -" Foreground="White" FontSize="13"/>
+            <TextBlock Name="RecapDurationText" Text="Duration goal: -" Foreground="White" FontSize="13"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Handoff: last shift's report -->
+        <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Last Shift Report" Foreground="White" FontSize="14" FontWeight="Bold"/>
+            <TextBlock Name="HandoffMetaText" Text="" Foreground="#FF888888" FontSize="11"/>
+            <TextBlock Name="HandoffSummaryText" Text="No previous shift report found for this model." Foreground="White" FontSize="13" TextWrapping="Wrap"/>
+            <TextBlock Name="HandoffGoodMembersText" Text="" Foreground="#FFa6e3a1" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
+            <TextBlock Name="HandoffIssuesText" Text="" Foreground="#FFf9e2af" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
+            <TextBlock Name="HandoffRatingText" Text="" Foreground="#FFcba6f7" FontSize="12" FontWeight="Bold" IsVisible="False"/>
+          </StackPanel>
+        </Border>
+
+        <!-- VIP / flagged fans -->
+        <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FFcba6f7" BorderThickness="1">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Flagged / VIP Fans" Foreground="#FFcba6f7" FontSize="14" FontWeight="Bold"/>
+            <StackPanel Name="VipFansPanel" Spacing="8"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Checklist -->
+        <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Pre-Shift Checklist" Foreground="White" FontSize="14" FontWeight="Bold"/>
+            <CheckBox Name="ChkCamera" Content="Camera looks good (lighting, framing, focus)" Foreground="White"/>
+            <CheckBox Name="ChkMic" Content="Mic tested and levels sound right" Foreground="White"/>
+            <CheckBox Name="ChkHotkeys" Content="Show / Private / Typing hotkeys confirmed" Foreground="White"/>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Footer buttons -->
+    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="20,0,20,20">
+      <Button Grid.Column="0" Name="BtnBack" Content="Back" Height="34" Background="#FFFF0000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnBack_Click"/>
+      <Button Grid.Column="1" Name="BtnConfirmStart" Content="Confirm &amp; Start Shift" Height="34" Background="#FFa6e3a1" Foreground="Black" IsEnabled="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnConfirmStart_Click"/>
+    </Grid>
+  </Grid>
+</Window>

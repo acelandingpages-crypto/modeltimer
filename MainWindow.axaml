@@ -1,0 +1,107 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
+        x:Class="ModelTimer.MainWindow"
+        Title="Ace Models Timer"
+    Width="400"
+    Height="600"
+    MinWidth="400"
+    MinHeight="600"
+    Background="#FF1E1E1E"
+    Icon="/Assets/favicon.ico">
+
+  <Window.Resources>
+    <SolidColorBrush x:Key="GreenBrush" Color="#FF00FF00"/>
+    <SolidColorBrush x:Key="RedBrush" Color="#FFFF0000"/>
+    <SolidColorBrush x:Key="DarkBrush" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="LightBrush" Color="#FFCCCCCC"/>
+  </Window.Resources>
+
+  <Grid x:Name="MainGrid" RowDefinitions="Auto,*,Auto" Margin="10" >
+
+    <!-- Top Toolbar -->
+    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+      <Button Name="BtnHighTraffic" Content="High Traffic" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnHighTraffic_Click" IsTabStop="False" Focusable="False"/>
+      <Button Name="BtnShiftHistory" Content="Shift History" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnShiftHistory_Click" IsTabStop="False" Focusable="False"/>
+      <Button Name="BtnActivity" Content="Activity" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnActivity_Click" IsTabStop="False" Focusable="False"/>
+      <Button Name="BtnSettings" Content="Settings" Height="30" Background="#FF3E3E42" Foreground="White" Click="BtnSettings_Click" IsTabStop="False" Focusable="False"/>
+    </StackPanel>
+
+    <!-- Main Content -->
+    <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="15">
+
+      <!-- Timer Display -->
+      <Border Grid.Row="0" x:Name="TimerBorder" Background="#FF252526" Padding="24,16,24,16" CornerRadius="10" HorizontalAlignment="Center">
+        <StackPanel HorizontalAlignment="Center" Spacing="2">
+          <TextBlock Name="TimeWorkedLabel" Text="TIME WORKED" Foreground="#FF888888" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"/>
+          <TextBlock Name="ElapsedText" Text="00:00:00" Foreground="#FF00FF00" FontSize="64" FontFamily="Consolas" FontWeight="Bold" HorizontalAlignment="Center"/>
+          <TextBlock Name="MilestoneText" Text="" Foreground="#FFf9e2af" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="1" x:Name="ProgressBorder" Background="#FF2D2D30" Height="40" CornerRadius="8" Name="ProgressBar">
+        <Grid>
+          <Rectangle Fill="#FF555555" Width="{Binding #ProgressBar.Bounds.Width, RelativeSource={RelativeSource AncestorType=Border}}" Height="40" HorizontalAlignment="Stretch"/>
+          <Rectangle Name="ProgressGreen" Fill="#FF00FF00" Width="0" Height="40" HorizontalAlignment="Left"/>
+          <Rectangle Name="ProgressRed" Fill="#FFFF0000" Width="0" Height="40" HorizontalAlignment="Right"/>
+          <TextBlock Name="ProgressText" Text="0%" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+      </Border>
+
+      <!-- Image Display -->
+      <Border Grid.Row="2" Name="ImageBorder" x:Name="ImageBorderBg" Background="#FF2D2D30" Padding="10" CornerRadius="8" ClipToBounds="True">
+        <Grid>
+          <Viewbox Name="ReadyViewbox" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" IsVisible="True">
+            <StackPanel Name="ReadyPanel" Spacing="10">
+              <Border BorderBrush="#FF888888" BorderThickness="1" Padding="10" MinWidth="120" HorizontalAlignment="Center" CornerRadius="6">
+                <TextBlock Name="ReadyText" Text="Ready" Foreground="#FFFF0000" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
+              </Border>
+              <Border BorderBrush="#FF888888" BorderThickness="1" Padding="10" MinWidth="120" HorizontalAlignment="Center" CornerRadius="6">
+                <TextBlock Name="HourglassText" Text="⏳" Foreground="#FF888888" FontSize="32" HorizontalAlignment="Center"/>
+              </Border>
+            </StackPanel>
+          </Viewbox>
+          <Grid x:Name="StatusImagePanel" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Name="StatusImageLabel" Text="" Foreground="Black" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+            <Border Grid.Row="1" x:Name="StatusImageBorder" CornerRadius="8" ClipToBounds="True" Background="Transparent">
+              <Image Name="StatusImage" Stretch="Uniform" MaxWidth="800" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </Border>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <!-- Shift Status -->
+      <Border Grid.Row="3" x:Name="ShiftStatusBorder" Background="#FF252526" Padding="10" CornerRadius="8" Margin="0,5,0,0">
+        <Grid>
+          <StackPanel Name="ShiftStatusPanel" Orientation="Horizontal" HorizontalAlignment="Center" IsVisible="False">
+            <TextBlock Name="StatusModelPrefix" Text="Model - " Foreground="White" FontSize="14"/>
+            <TextBlock Name="StatusModelName" Text="" Foreground="#FFa6e3a1" FontSize="14"/>
+            <TextBlock Name="StatusModeratorPrefix" Text=" | Moderator - " Foreground="White" FontSize="14"/>
+            <TextBlock Name="StatusModeratorName" Text="" Foreground="#FFa6e3a1" FontSize="14"/>
+          </StackPanel>
+          <TextBlock Name="ShiftStatusText" Text="No active shift" Foreground="#FFFF0000" FontSize="14" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        </Grid>
+      </Border>
+
+      <!-- Control Buttons Row 1 -->
+      <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
+        <Button Name="BtnShow" Content="Show" Width="110" Height="30" Background="#FFa6e3a1" Foreground="Black" Margin="0,0,15,0" HorizontalContentAlignment="Center" Click="ShowButton_Click" IsTabStop="False" Focusable="False"/>
+        <Button Name="BtnPrivate" Content="Private" Width="110" Height="30" Background="#FFcba6f7" Foreground="Black" Margin="0,0,15,0" HorizontalContentAlignment="Center" Click="PrivateButton_Click" IsTabStop="False" Focusable="False"/>
+        <Button Name="BtnTyping" Content="Typing" Width="110" Height="30" Background="#FF89dceb" Foreground="Black" HorizontalContentAlignment="Center" Click="TypingButton_Click" IsTabStop="False" Focusable="False"/>
+      </StackPanel>
+
+      <!-- Control Buttons Row 2 -->
+      <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+        <Button Name="BtnStart" Content="Start" Width="110" Height="30" Background="#FFa6e3a1" Foreground="Black" Margin="0,0,15,0" HorizontalContentAlignment="Center" Click="StartResume_Click" IsTabStop="False" Focusable="False"/>
+        <Button Name="BtnPause" Content="Pause" Width="110" Height="30" Background="#FFCA5010" Foreground="White" Margin="0,0,15,0" HorizontalContentAlignment="Center" Click="Pause_Click" IsTabStop="False" Focusable="False"/>
+        <Button Name="BtnStop" Content="Stop" Width="110" Height="30" Background="#FFC42B1C" Foreground="White" HorizontalContentAlignment="Center" Click="Stop_Click" IsTabStop="False" Focusable="False"/>
+      </StackPanel>
+
+    </Grid>
+
+  </Grid>
+</Window>

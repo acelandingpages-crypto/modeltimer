@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ModelTimer.HighTrafficWindow"
+        Title="High Traffic"
+        Width="900"
+        Height="700"
+        MinWidth="900"
+        MinHeight="700"
+        Background="#FF1E1E1E"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="30,Auto,Auto,*" Margin="0">
+    <!-- Title Bar with Title and Filter -->
+    <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed" ClipToBounds="False">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="10,0,0,0">
+          <TextBlock Text="👑" FontSize="16" VerticalAlignment="Center"/>
+          <TextBlock Text="High-Value Traffic &amp; CRM" Foreground="#FF000000" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,5,0" ClipToBounds="False">
+          <TextBlock Text="🔍" FontSize="12" VerticalAlignment="Center"/>
+          <TextBlock Text="Filter by Site:" Foreground="#FF000000" VerticalAlignment="Center"/>
+          <ComboBox Name="SiteFilterComboBox" Width="90" Height="20" Background="#FF3E3E42" Foreground="White" VerticalAlignment="Center" SelectedIndex="0" MinWidth="90">
+            <ComboBoxItem Content="All" Foreground="White"/>
+            <ComboBoxItem Content="Chaturbate" Foreground="White"/>
+            <ComboBoxItem Content="Stripchat" Foreground="White"/>
+            <ComboBoxItem Content="Camsoda" Foreground="White"/>
+            <ComboBoxItem Content="Cam4" Foreground="White"/>
+            <ComboBoxItem Content="MyFreeCams" Foreground="White"/>
+            <ComboBoxItem Content="Bongacams" Foreground="White"/>
+          </ComboBox>
+        </StackPanel>
+        <Button Grid.Column="2" Name="CloseButton" Width="28" Height="28" Background="#FFFF0000" Click="CloseButton_Click" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+          <TextBlock Text="X" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Row 1: Data Entry Form -->
+    <Border Grid.Row="1" Padding="10" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
+      <Border Background="#FF1E1E1E" Padding="10" CornerRadius="6" BorderBrush="#FF555555" BorderThickness="1">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+          <!-- Form Row 1: User, Model and Platform -->
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,Auto" ColumnSpacing="6">
+            <TextBlock Grid.Column="0" Text="User:" Foreground="White" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Name="UserTextBox" PlaceholderText="Member Username..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Text="Model:" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="3" Name="ModelComboBox" IsEditable="True" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="4" Text="Platform:" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="5" Name="PlatformComboBox" Width="120" Height="26" Background="#FF3E3E42" Foreground="White" VerticalAlignment="Center">
+              <ComboBoxItem Content="Chaturbate"/>
+              <ComboBoxItem Content="Stripchat"/>
+              <ComboBoxItem Content="Camsoda"/>
+              <ComboBoxItem Content="Cam4"/>
+              <ComboBoxItem Content="MyFreeCams"/>
+              <ComboBoxItem Content="Bongacams"/>
+            </ComboBox>
+            <Button Grid.Column="6" Name="BtnSaveProfile" Content="Save" Height="32" Background="#FFa6e3a1" Foreground="Black" VerticalAlignment="Center" Click="BtnSaveProfile_Click"/>
+            <Button Grid.Column="7" Name="BtnUpdateProfile" Content="Update" Height="32" Background="#FFcba6f7" Foreground="Black" VerticalAlignment="Center" Click="BtnUpdateProfile_Click"/>
+          </Grid>
+          <!-- Form Row 2: Habits, Triggers, Notes on one line -->
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="6">
+            <TextBlock Grid.Column="0" Text="Habits:" Foreground="White" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Name="HabitsTextBox" PlaceholderText="e.g. Wheel Spins, Big Pvt Shows..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Text="Triggers:" Foreground="White" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="3" Name="TriggersTextBox" PlaceholderText="Triggers: Likes dirty talk, control, feet..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="4" Text="Notes:" Foreground="White" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="5" Name="NotesTextBox" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
+          </Grid>
+        </Grid>
+      </Border>
+    </Border>
+
+    <!-- Row 2: CRM Data Table -->
+    <Border Grid.Row="2" Padding="10" Background="#FF1E1E1E">
+      <Grid RowDefinitions="*,Auto">
+        <ScrollViewer Grid.Row="0" Name="TableScrollViewer">
+          <Grid Name="TableGrid" ColumnDefinitions="120,100,100,*,*,*,120"/>
+        </ScrollViewer>
+        <TextBlock Grid.Row="1" Name="NoDataText" Text="No records found." Foreground="#FF888888" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0" IsVisible="False"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
