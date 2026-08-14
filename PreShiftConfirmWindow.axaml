@@ -54,8 +54,11 @@
         <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
           <StackPanel Spacing="10">
             <TextBlock Text="Pre-Shift Checklist" Foreground="White" FontSize="14" FontWeight="Bold"/>
-            <CheckBox Name="ChkCamera" Content="Camera looks good (lighting, framing, focus)" Foreground="White"/>
+            <CheckBox Name="ChkLighting" Content="Lighting looks good (well-lit, no harsh shadows)" Foreground="White"/>
+            <CheckBox Name="ChkFraming" Content="Camera framing and focus are correct" Foreground="White"/>
+            <CheckBox Name="ChkObsScene" Content="OBS scene is live with the right webcam source" Foreground="White"/>
             <CheckBox Name="ChkMic" Content="Mic tested and levels sound right" Foreground="White"/>
+            <CheckBox Name="ChkBackground" Content="Background/room is tidy and appropriate" Foreground="White"/>
             <CheckBox Name="ChkHotkeys" Content="Show / Private / Typing hotkeys confirmed" Foreground="White"/>
           </StackPanel>
         </Border>

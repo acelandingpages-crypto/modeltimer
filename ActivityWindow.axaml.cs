@@ -675,7 +675,8 @@ public partial class ActivityWindow : Window
             foreach (var fan in topSpenders)
             {
                 var tier = SpendTierLabels[Math.Clamp(fan.SpendTier, 0, SpendTierLabels.Length - 1)];
-                AddInsightRow(TopSpendersPanel, $"{fan.User} ({fan.Model}) — {tier}", "#FFFFFFFF");
+                var site = string.IsNullOrWhiteSpace(fan.Site) ? "Unknown site" : fan.Site;
+                AddInsightRow(TopSpendersPanel, $"{fan.User} · {site} · {fan.Model} — {tier}", "#FFFFFFFF");
             }
         }
 
@@ -695,7 +696,8 @@ public partial class ActivityWindow : Window
             foreach (var fan in churnRisk)
             {
                 var daysAgo = (int)(DateTime.Now - fan.CreatedAt).TotalDays;
-                AddInsightRow(ChurnRiskPanel, $"{fan.User} ({fan.Model}) — {daysAgo}d since last touch", "#FFFFFFFF");
+                var site = string.IsNullOrWhiteSpace(fan.Site) ? "Unknown site" : fan.Site;
+                AddInsightRow(ChurnRiskPanel, $"{fan.User} · {site} · {fan.Model} — {daysAgo}d since last touch", "#FFFFFFFF");
             }
         }
 

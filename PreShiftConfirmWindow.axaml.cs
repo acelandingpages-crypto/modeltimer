@@ -37,8 +37,11 @@ public partial class PreShiftConfirmWindow : Window
         LoadHandoffNotes();
         LoadVipFans();
 
-        ChkCamera.IsCheckedChanged += (s, e) => UpdateStartButtonState();
+        ChkLighting.IsCheckedChanged += (s, e) => UpdateStartButtonState();
+        ChkFraming.IsCheckedChanged += (s, e) => UpdateStartButtonState();
+        ChkObsScene.IsCheckedChanged += (s, e) => UpdateStartButtonState();
         ChkMic.IsCheckedChanged += (s, e) => UpdateStartButtonState();
+        ChkBackground.IsCheckedChanged += (s, e) => UpdateStartButtonState();
         ChkHotkeys.IsCheckedChanged += (s, e) => UpdateStartButtonState();
 
         try
@@ -57,8 +60,11 @@ public partial class PreShiftConfirmWindow : Window
 
     private void UpdateStartButtonState()
     {
-        BtnConfirmStart.IsEnabled = (ChkCamera.IsChecked ?? false) &&
+        BtnConfirmStart.IsEnabled = (ChkLighting.IsChecked ?? false) &&
+                                     (ChkFraming.IsChecked ?? false) &&
+                                     (ChkObsScene.IsChecked ?? false) &&
                                      (ChkMic.IsChecked ?? false) &&
+                                     (ChkBackground.IsChecked ?? false) &&
                                      (ChkHotkeys.IsChecked ?? false);
     }
 
