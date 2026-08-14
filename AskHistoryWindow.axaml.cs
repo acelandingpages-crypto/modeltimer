@@ -232,21 +232,27 @@ public partial class AskHistoryWindow : Window
             return;
         }
 
+        var originalContent = BtnAskAi.Content;
         try
         {
             BtnAskAi.IsEnabled = false;
+            BtnAskAi.Content = "Thinking...";
+            AiAnswerText.Text = "Asking AI, hang on...";
+            AiAnswerBorder.IsVisible = true;
+
             var database = BuildFullDatabaseContext();
             var answer = await AiSummaryService.AskAsync(settings!, question, database);
             AiAnswerText.Text = answer;
-            AiAnswerBorder.IsVisible = true;
         }
         catch (Exception ex)
         {
+            AiAnswerBorder.IsVisible = false;
             ShowInfoDialog("AI Answering Unavailable", ex.Message);
         }
         finally
         {
             BtnAskAi.IsEnabled = true;
+            BtnAskAi.Content = originalContent;
         }
     }
 
