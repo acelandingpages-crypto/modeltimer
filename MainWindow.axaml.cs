@@ -445,6 +445,11 @@ public partial class MainWindow : Window
         var activityWindow = new ActivityWindow();
         activityWindow.Show(this);
     }
+    private void BtnAsk_Click(object sender, RoutedEventArgs e)
+    {
+        var askWindow = new AskHistoryWindow();
+        askWindow.Show(this);
+    }
     private void BtnSettings_Click(object sender, RoutedEventArgs e)
     {
         _settingsWindow = new SettingsWindow();
@@ -510,6 +515,8 @@ public partial class MainWindow : Window
         BtnShiftHistory.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         BtnActivity.Background = new SolidColorBrush(Color.Parse(bgToolbar));
         BtnActivity.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        BtnAsk.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        BtnAsk.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         BtnSettings.Background = new SolidColorBrush(Color.Parse(bgToolbar));
         BtnSettings.Foreground = new SolidColorBrush(Color.Parse(fgMain));
 

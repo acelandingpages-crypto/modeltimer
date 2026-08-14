@@ -15,4 +15,12 @@ internal static class AiSummaryService
     {
         throw new NotSupportedException($"AI drafting isn't wired up to {settings.AiProvider} yet — this is a placeholder for future integration.");
     }
+
+    // Same seam as DraftSummaryAsync: the "Ask" panel already retrieves and displays matching
+    // shift/CRM records itself without any AI involved, so this only needs to synthesize a
+    // natural-language answer over records the UI has already found.
+    public static Task<string> AskAsync(AppSettings settings, string question, string matchingRecordsContext)
+    {
+        throw new NotSupportedException($"AI-synthesized answers aren't wired up to {settings.AiProvider} yet — this is a placeholder for future integration. The matches below are found by keyword search only.");
+    }
 }
