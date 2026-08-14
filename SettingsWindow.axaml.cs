@@ -133,6 +133,7 @@ public partial class SettingsWindow : Window
         {
             "Anthropic Claude" => 1,
             "OpenAI" => 2,
+            "OpenRouter" => 3,
             _ => 0
         };
         AiApiKeyBox.Text = AiApiKey;
