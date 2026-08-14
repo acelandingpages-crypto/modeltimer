@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -139,41 +138,32 @@ public partial class ShiftHistoryWindow : Window
         _minDate = null;
         _maxDate = null;
 
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
+        if (data?.Shifts == null) return;
+
+        int no = 1;
+        foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
         {
-            if (!System.IO.File.Exists(_dataFilePath)) return;
+            if (!_minDate.HasValue || entry.Timestamp.Date < _minDate.Value.Date) _minDate = entry.Timestamp.Date;
+            if (!_maxDate.HasValue || entry.Timestamp.Date > _maxDate.Value.Date) _maxDate = entry.Timestamp.Date;
 
-            var json = System.IO.File.ReadAllText(_dataFilePath);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null) return;
-
-            int no = 1;
-            foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
+            var item = new ShiftHistoryItem
             {
-                if (!_minDate.HasValue || entry.Timestamp.Date < _minDate.Value.Date) _minDate = entry.Timestamp.Date;
-                if (!_maxDate.HasValue || entry.Timestamp.Date > _maxDate.Value.Date) _maxDate = entry.Timestamp.Date;
+                Id = no++,
+                Model = entry.Model ?? string.Empty,
+                Moderator = entry.Moderator ?? string.Empty,
+                Notes = entry.Notes ?? string.Empty,
+                StartTime = entry.StartTime,
+                StopTime = entry.StopTime,
+                Timestamp = entry.Timestamp,
+                DurationHours = entry.DurationHours,
+                DurationMinutes = entry.DurationMinutes,
+                ElapsedHours = entry.ElapsedHours,
+                ElapsedMinutes = entry.ElapsedMinutes,
+                ElapsedSeconds = entry.ElapsedSeconds
+            };
 
-                var item = new ShiftHistoryItem
-                {
-                    Id = no++,
-                    Model = entry.Model ?? string.Empty,
-                    Moderator = entry.Moderator ?? string.Empty,
-                    Notes = entry.Notes ?? string.Empty,
-                    StartTime = entry.StartTime,
-                    StopTime = entry.StopTime,
-                    Timestamp = entry.Timestamp,
-                    DurationHours = entry.DurationHours,
-                    DurationMinutes = entry.DurationMinutes,
-                    ElapsedHours = entry.ElapsedHours,
-                    ElapsedMinutes = entry.ElapsedMinutes,
-                    ElapsedSeconds = entry.ElapsedSeconds
-                };
-
-                _allShifts.Add(item);
-            }
-        }
-        catch
-        {
+            _allShifts.Add(item);
         }
     }
 
@@ -381,73 +371,49 @@ public partial class ShiftHistoryWindow : Window
         var item = _filteredShifts.FirstOrDefault(s => s.Id == id);
         if (item == null) return;
 
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
+        if (data?.Shifts == null) return;
+
+        var toRemove = data.Shifts.FirstOrDefault(s =>
+            s.Model == item.Model &&
+            s.Moderator == item.Moderator &&
+            s.Timestamp == item.Timestamp);
+
+        if (toRemove != null)
         {
-            if (!System.IO.File.Exists(_dataFilePath)) return;
+            data.Shifts.Remove(toRemove);
+            if (!JsonStore.Save(_dataFilePath, data)) return;
+            LoadShiftHistory();
 
-            var json = System.IO.File.ReadAllText(_dataFilePath);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null) return;
-
-            var toRemove = data.Shifts.FirstOrDefault(s =>
-                s.Model == item.Model &&
-                s.Moderator == item.Moderator &&
-                s.Timestamp == item.Timestamp);
-
-            if (toRemove != null)
+            if (!_allShifts.Any())
             {
-                data.Shifts.Remove(toRemove);
-                var jsonOut = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                System.IO.File.WriteAllText(_dataFilePath, jsonOut);
-                LoadShiftHistory();
-
-                if (!_allShifts.Any())
-                {
-                    FromDatePicker.IsEnabled = false;
-                    ToDatePicker.IsEnabled = false;
-                    FromDatePicker.SelectedDate = null;
-                    ToDatePicker.SelectedDate = null;
-                }
-                else
-                {
-                    if (_minDate.HasValue) FromDatePicker.SelectedDate = _minDate.Value;
-                    if (_maxDate.HasValue) ToDatePicker.SelectedDate = _maxDate.Value;
-                }
-
-                RefreshTable();
+                FromDatePicker.IsEnabled = false;
+                ToDatePicker.IsEnabled = false;
+                FromDatePicker.SelectedDate = null;
+                ToDatePicker.SelectedDate = null;
             }
-        }
-        catch
-        {
+            else
+            {
+                if (_minDate.HasValue) FromDatePicker.SelectedDate = _minDate.Value;
+                if (_maxDate.HasValue) ToDatePicker.SelectedDate = _maxDate.Value;
+            }
+
+            RefreshTable();
         }
     }
 
     private void ApplyTheme()
     {
-        try
+        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (settings != null && settings.Theme == "Light")
         {
-            var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            if (System.IO.File.Exists(settingsPath))
-            {
-                var json = System.IO.File.ReadAllText(settingsPath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null && settings.Theme == "Light")
-                {
-                    RequestedThemeVariant = ThemeVariant.Light;
-                    UpdateThemeColors(true);
-                }
-                else
-                {
-                    UpdateThemeColors(false);
-                }
-            }
-            else
-            {
-                UpdateThemeColors(false);
-            }
+            RequestedThemeVariant = ThemeVariant.Light;
+            UpdateThemeColors(true);
         }
-        catch
+        else
         {
+            UpdateThemeColors(false);
         }
     }
 

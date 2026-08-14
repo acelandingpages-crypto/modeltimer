@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -559,7 +558,14 @@ public partial class ActivityWindow : Window
         }
 
         var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "activity_export.csv");
-        File.WriteAllText(path, sb.ToString());
+        try
+        {
+            File.WriteAllText(path, sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            JsonStore.LogError($"Failed to write {path}", ex);
+        }
     }
 
     private void BtnExportExcel_Click(object? sender, RoutedEventArgs e)
@@ -575,7 +581,14 @@ public partial class ActivityWindow : Window
         }
 
         var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "activity_export.tsv");
-        File.WriteAllText(path, sb.ToString());
+        try
+        {
+            File.WriteAllText(path, sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            JsonStore.LogError($"Failed to write {path}", ex);
+        }
     }
 
     private void TitleBar_PointerPressed(object sender, PointerPressedEventArgs e)
@@ -595,69 +608,46 @@ public partial class ActivityWindow : Window
         _minDate = null;
         _maxDate = null;
 
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
+        if (data?.Shifts == null) return;
+
+        foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
         {
-            if (!System.IO.File.Exists(_dataFilePath)) return;
+            if (!_minDate.HasValue || entry.Timestamp.Date < _minDate.Value.Date) _minDate = entry.Timestamp.Date;
+            if (!_maxDate.HasValue || entry.Timestamp.Date > _maxDate.Value.Date) _maxDate = entry.Timestamp.Date;
 
-            var json = System.IO.File.ReadAllText(_dataFilePath);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null) return;
-
-            foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
+            var item = new ShiftHistoryItem
             {
-                if (!_minDate.HasValue || entry.Timestamp.Date < _minDate.Value.Date) _minDate = entry.Timestamp.Date;
-                if (!_maxDate.HasValue || entry.Timestamp.Date > _maxDate.Value.Date) _maxDate = entry.Timestamp.Date;
+                Id = _allShifts.Count + 1,
+                Model = entry.Model ?? string.Empty,
+                Moderator = entry.Moderator ?? string.Empty,
+                Notes = entry.Notes ?? string.Empty,
+                StartTime = entry.StartTime,
+                StopTime = entry.StopTime,
+                Timestamp = entry.Timestamp,
+                DurationHours = entry.DurationHours,
+                DurationMinutes = entry.DurationMinutes,
+                ElapsedHours = entry.ElapsedHours,
+                ElapsedMinutes = entry.ElapsedMinutes,
+                ElapsedSeconds = entry.ElapsedSeconds
+            };
 
-                var item = new ShiftHistoryItem
-                {
-                    Id = _allShifts.Count + 1,
-                    Model = entry.Model ?? string.Empty,
-                    Moderator = entry.Moderator ?? string.Empty,
-                    Notes = entry.Notes ?? string.Empty,
-                    StartTime = entry.StartTime,
-                    StopTime = entry.StopTime,
-                    Timestamp = entry.Timestamp,
-                    DurationHours = entry.DurationHours,
-                    DurationMinutes = entry.DurationMinutes,
-                    ElapsedHours = entry.ElapsedHours,
-                    ElapsedMinutes = entry.ElapsedMinutes,
-                    ElapsedSeconds = entry.ElapsedSeconds
-                };
-
-                _allShifts.Add(item);
-            }
-        }
-        catch
-        {
+            _allShifts.Add(item);
         }
     }
 
     private void ApplyTheme()
     {
-        try
+        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (settings != null && settings.Theme == "Light")
         {
-            var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            if (System.IO.File.Exists(settingsPath))
-            {
-                var json = System.IO.File.ReadAllText(settingsPath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null && settings.Theme == "Light")
-                {
-                    RequestedThemeVariant = ThemeVariant.Light;
-                    UpdateThemeColors(true);
-                }
-                else
-                {
-                    UpdateThemeColors(false);
-                }
-            }
-            else
-            {
-                UpdateThemeColors(false);
-            }
+            RequestedThemeVariant = ThemeVariant.Light;
+            UpdateThemeColors(true);
         }
-        catch
+        else
         {
+            UpdateThemeColors(false);
         }
     }
 

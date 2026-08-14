@@ -2,13 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -55,39 +54,72 @@ public partial class ShiftReportWindow : Window
 
     private void BtnSubmit_Click(object sender, RoutedEventArgs e)
     {
-        _submitted = true;
-        SaveReport();
-        Close();
+        if (SaveReport())
+        {
+            _submitted = true;
+            Close();
+        }
+        else
+        {
+            ShowSaveFailedWarning();
+        }
     }
 
-    private void SaveReport()
+    private bool SaveReport()
     {
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
+        if (data?.Shifts == null || data.Shifts.Count == 0) return false;
+
+        var lastEntry = data.Shifts[^1];
+        if (!string.Equals(lastEntry.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(lastEntry.Moderator?.Trim(), _moderator.Trim(), StringComparison.OrdinalIgnoreCase))
         {
-            if (!File.Exists(_dataFilePath)) return;
-
-            var json = File.ReadAllText(_dataFilePath);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null || data.Shifts.Count == 0) return;
-
-            var lastEntry = data.Shifts[^1];
-            if (!string.Equals(lastEntry.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(lastEntry.Moderator?.Trim(), _moderator.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            lastEntry.SessionSummary = SummaryTextBox.Text?.Trim() ?? string.Empty;
-            lastEntry.GoodMembers = GoodMembersTextBox.Text?.Trim() ?? string.Empty;
-            lastEntry.IssuesToWatch = IssuesTextBox.Text?.Trim() ?? string.Empty;
-            lastEntry.PerformanceRating = RatingComboBox.SelectedIndex;
-
-            var jsonOut = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_dataFilePath, jsonOut);
+            return false;
         }
-        catch
+
+        lastEntry.SessionSummary = SummaryTextBox.Text?.Trim() ?? string.Empty;
+        lastEntry.GoodMembers = GoodMembersTextBox.Text?.Trim() ?? string.Empty;
+        lastEntry.IssuesToWatch = IssuesTextBox.Text?.Trim() ?? string.Empty;
+        lastEntry.PerformanceRating = RatingComboBox.SelectedIndex;
+
+        return JsonStore.Save(_dataFilePath, data);
+    }
+
+    private void ShowSaveFailedWarning()
+    {
+        var dialog = new Window
         {
-        }
+            Title = "Save Failed",
+            Width = 380,
+            Height = 190,
+            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Couldn't save the shift report to disk. Please note it down manually, then try Submit again.",
+            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Width = 100,
+            Height = 30,
+            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
+            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+        };
+        okBtn.Click += (s, e) => dialog.Close();
+
+        panel.Children.Add(okBtn);
+        dialog.Content = panel;
+        dialog.ShowDialog(this);
     }
 
     private class ShiftDataFile

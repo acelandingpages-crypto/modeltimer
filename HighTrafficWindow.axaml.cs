@@ -13,7 +13,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -37,19 +36,13 @@ public partial class HighTrafficWindow : Window
 
     private void LoadModelsList()
     {
-        try
+        var shiftDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
+        var data = JsonStore.Load<ModelsOnlyFile>(shiftDataPath);
+        if (data?.Models == null) return;
+        foreach (var model in data.Models)
         {
-            var shiftDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-            if (!System.IO.File.Exists(shiftDataPath)) return;
-            var json = System.IO.File.ReadAllText(shiftDataPath);
-            var data = JsonSerializer.Deserialize<ModelsOnlyFile>(json);
-            if (data?.Models == null) return;
-            foreach (var model in data.Models)
-            {
-                ModelComboBox.Items.Add(model);
-            }
+            ModelComboBox.Items.Add(model);
         }
-        catch { }
     }
 
     private void TitleBar_PointerPressed(object sender, PointerPressedEventArgs e)
@@ -82,53 +75,43 @@ public partial class HighTrafficWindow : Window
     {
         _records.Clear();
         _nextId = 1;
-        try
+
+        var data = JsonStore.Load<CrmDataFile>(_dataFilePath);
+        if (data?.Records == null) return;
+        foreach (var r in data.Records.OrderBy(x => x.Id))
         {
-            if (!System.IO.File.Exists(_dataFilePath)) return;
-            var json = System.IO.File.ReadAllText(_dataFilePath);
-            var data = JsonSerializer.Deserialize<CrmDataFile>(json);
-            if (data?.Records == null) return;
-            foreach (var r in data.Records.OrderBy(x => x.Id))
+            _records.Add(new CrmRecord
             {
-                _records.Add(new CrmRecord
-                {
-                    Id = r.Id,
-                    User = r.User ?? string.Empty,
-                    Model = r.Model ?? string.Empty,
-                    Site = r.Site ?? string.Empty,
-                    Habits = r.Habits ?? string.Empty,
-                    Triggers = r.Triggers ?? string.Empty,
-                    Notes = r.Notes ?? string.Empty,
-                    CreatedAt = r.CreatedAt
-                });
-                if (r.Id >= _nextId) _nextId = r.Id + 1;
-            }
+                Id = r.Id,
+                User = r.User ?? string.Empty,
+                Model = r.Model ?? string.Empty,
+                Site = r.Site ?? string.Empty,
+                Habits = r.Habits ?? string.Empty,
+                Triggers = r.Triggers ?? string.Empty,
+                Notes = r.Notes ?? string.Empty,
+                CreatedAt = r.CreatedAt
+            });
+            if (r.Id >= _nextId) _nextId = r.Id + 1;
         }
-        catch { }
     }
 
     private void SaveRecords()
     {
-        try
+        var data = new CrmDataFile
         {
-            var data = new CrmDataFile
+            Records = _records.Select(r => new CrmEntry
             {
-                Records = _records.Select(r => new CrmEntry
-                {
-                    Id = r.Id,
-                    User = r.User,
-                    Model = r.Model,
-                    Site = r.Site,
-                    Habits = r.Habits,
-                    Triggers = r.Triggers,
-                    Notes = r.Notes,
-                    CreatedAt = r.CreatedAt
-                }).ToList()
-            };
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            System.IO.File.WriteAllText(_dataFilePath, json);
-        }
-        catch { }
+                Id = r.Id,
+                User = r.User,
+                Model = r.Model,
+                Site = r.Site,
+                Habits = r.Habits,
+                Triggers = r.Triggers,
+                Notes = r.Notes,
+                CreatedAt = r.CreatedAt
+            }).ToList()
+        };
+        JsonStore.Save(_dataFilePath, data);
     }
 
     private void RefreshTable()

@@ -6,7 +6,6 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using System;
 using System.IO;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -39,30 +38,16 @@ public partial class SettingsWindow : Window
 
     private void ApplyTheme()
     {
-        try
+        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (settings != null && settings.Theme == "Light")
         {
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            if (File.Exists(settingsPath))
-            {
-                var json = File.ReadAllText(settingsPath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null && settings.Theme == "Light")
-                {
-                    RequestedThemeVariant = ThemeVariant.Light;
-                    UpdateThemeColors(true);
-                }
-                else
-                {
-                    UpdateThemeColors(false);
-                }
-            }
-            else
-            {
-                UpdateThemeColors(false);
-            }
+            RequestedThemeVariant = ThemeVariant.Light;
+            UpdateThemeColors(true);
         }
-        catch
+        else
         {
+            UpdateThemeColors(false);
         }
     }
 
@@ -112,26 +97,16 @@ public partial class SettingsWindow : Window
 
     private void LoadSettings()
     {
-        try
+        var settings = JsonStore.Load<AppSettings>(_dataFilePath);
+        if (settings != null)
         {
-            if (File.Exists(_dataFilePath))
-            {
-                var json = File.ReadAllText(_dataFilePath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null)
-                {
-                    SelectedTheme = settings.Theme ?? "Dark";
-                    ShowHotkey = settings.ShowHotkey ?? "ctrl + s";
-                    PrivateHotkey = settings.PrivateHotkey ?? "ctrl + p";
-                    TypingHotkey = settings.TypingHotkey ?? "ctrl + k";
-                    NotifyOnShiftComplete = settings.NotifyOnShiftComplete;
-                    Warn5Min = settings.Warn5Min;
-                    Warn15Min = settings.Warn15Min;
-                }
-            }
-        }
-        catch
-        {
+            SelectedTheme = settings.Theme ?? "Dark";
+            ShowHotkey = settings.ShowHotkey ?? "ctrl + s";
+            PrivateHotkey = settings.PrivateHotkey ?? "ctrl + p";
+            TypingHotkey = settings.TypingHotkey ?? "ctrl + k";
+            NotifyOnShiftComplete = settings.NotifyOnShiftComplete;
+            Warn5Min = settings.Warn5Min;
+            Warn15Min = settings.Warn15Min;
         }
 
         ThemeComboBox.SelectedItem = SelectedTheme == "Light" ? ThemeComboBox.Items[0] : ThemeComboBox.Items[1];
@@ -145,25 +120,18 @@ public partial class SettingsWindow : Window
 
     private void SaveSettings()
     {
-        try
+        var settings = new AppSettings
         {
-            var settings = new AppSettings
-            {
-                Theme = ThemeComboBox.SelectedItem is ComboBoxItem item ? item.Content?.ToString() : "Dark",
-                ShowHotkey = ShowHotkeyBox.Text ?? "ctrl + s",
-                PrivateHotkey = PrivateHotkeyBox.Text ?? "ctrl + p",
-                TypingHotkey = TypingHotkeyBox.Text ?? "ctrl + k",
-                NotifyOnShiftComplete = ChkNotifyOnShiftComplete.IsChecked ?? false,
-                Warn5Min = ChkWarn5Min.IsChecked ?? false,
-                Warn15Min = ChkWarn15Min.IsChecked ?? false
-            };
+            Theme = ThemeComboBox.SelectedItem is ComboBoxItem item ? item.Content?.ToString() : "Dark",
+            ShowHotkey = ShowHotkeyBox.Text ?? "ctrl + s",
+            PrivateHotkey = PrivateHotkeyBox.Text ?? "ctrl + p",
+            TypingHotkey = TypingHotkeyBox.Text ?? "ctrl + k",
+            NotifyOnShiftComplete = ChkNotifyOnShiftComplete.IsChecked ?? false,
+            Warn5Min = ChkWarn5Min.IsChecked ?? false,
+            Warn15Min = ChkWarn15Min.IsChecked ?? false
+        };
 
-            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_dataFilePath, json);
-        }
-        catch
-        {
-        }
+        JsonStore.Save(_dataFilePath, settings);
     }
 
     private void BtnResetDefaults_Click(object sender, RoutedEventArgs e)

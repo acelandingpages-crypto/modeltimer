@@ -10,7 +10,6 @@ using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -548,30 +547,20 @@ public partial class MainWindow : Window
 
     private void LoadThemeOnStartup()
     {
-        try
+        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (settings != null && settings.Theme == "Light")
         {
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            if (File.Exists(settingsPath))
+            RequestedThemeVariant = ThemeVariant.Light;
+            if (Application.Current is App app)
             {
-                var json = File.ReadAllText(settingsPath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null && settings.Theme == "Light")
-                {
-                    RequestedThemeVariant = ThemeVariant.Light;
-                    if (Application.Current is App app)
-                    {
-                        app.RequestedThemeVariant = ThemeVariant.Light;
-                    }
-                    UpdateThemeColors(true);
-                }
-                else
-                {
-                    UpdateThemeColors(false);
-                }
+                app.RequestedThemeVariant = ThemeVariant.Light;
             }
+            UpdateThemeColors(true);
         }
-        catch
+        else
         {
+            UpdateThemeColors(false);
         }
     }
 
@@ -592,65 +581,39 @@ public partial class MainWindow : Window
 
     private void SaveShiftStopTime(TimeSpan elapsed)
     {
-        try
-        {
-            var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-            if (!File.Exists(filePath)) return;
+        var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
+        var data = JsonStore.Load<ShiftDataFile>(filePath);
+        if (data?.Shifts == null || data.Shifts.Count == 0) return;
 
-            var json = File.ReadAllText(filePath);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null || data.Shifts.Count == 0) return;
-
-            var lastEntry = data.Shifts[^1];
-            if (lastEntry.StopTime == null)
-            {
-                lastEntry.StopTime = DateTime.Now;
-                lastEntry.ElapsedHours = (int)elapsed.TotalHours;
-                lastEntry.ElapsedMinutes = elapsed.Minutes;
-                lastEntry.ElapsedSeconds = elapsed.Seconds;
-                var jsonOut = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(filePath, jsonOut);
-            }
-        }
-        catch
+        var lastEntry = data.Shifts[^1];
+        if (lastEntry.StopTime == null)
         {
+            lastEntry.StopTime = DateTime.Now;
+            lastEntry.ElapsedHours = (int)elapsed.TotalHours;
+            lastEntry.ElapsedMinutes = elapsed.Minutes;
+            lastEntry.ElapsedSeconds = elapsed.Seconds;
+            JsonStore.Save(filePath, data);
         }
     }
 
     private void SaveActiveShiftState()
     {
-        try
+        _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
+        var state = new ActiveShiftState
         {
-            _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
-            var state = new ActiveShiftState
-            {
-                Model = _currentModel,
-                Moderator = _currentModerator,
-                ElapsedSeconds = (long)_elapsed.TotalSeconds,
-                DurationHours = (int)_totalTime.TotalHours,
-                DurationMinutes = _totalTime.Minutes
-            };
-            var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_activeShiftPath, json);
-        }
-        catch
-        {
-        }
+            Model = _currentModel,
+            Moderator = _currentModerator,
+            ElapsedSeconds = (long)_elapsed.TotalSeconds,
+            DurationHours = (int)_totalTime.TotalHours,
+            DurationMinutes = _totalTime.Minutes
+        };
+        JsonStore.Save(_activeShiftPath, state);
     }
 
     private ActiveShiftState? LoadActiveShiftState()
     {
-        try
-        {
-            _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
-            if (!File.Exists(_activeShiftPath)) return null;
-            var json = File.ReadAllText(_activeShiftPath);
-            return JsonSerializer.Deserialize<ActiveShiftState>(json);
-        }
-        catch
-        {
-            return null;
-        }
+        _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
+        return JsonStore.Load<ActiveShiftState>(_activeShiftPath);
     }
 
     private void ClearActiveShiftState()
@@ -660,8 +623,9 @@ public partial class MainWindow : Window
             _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
             if (File.Exists(_activeShiftPath)) File.Delete(_activeShiftPath);
         }
-        catch
+        catch (Exception ex)
         {
+            JsonStore.LogError($"Failed to clear {_activeShiftPath}", ex);
         }
     }
 

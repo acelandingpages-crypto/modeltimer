@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -70,83 +69,61 @@ public partial class PreShiftConfirmWindow : Window
 
     private void LoadHandoffNotes()
     {
-        try
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
+        var data = JsonStore.Load<ShiftDataFile>(path);
+        if (data?.Shifts == null) return;
+
+        var lastShift = data.Shifts
+            .Where(s => s.StopTime.HasValue && string.Equals(s.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(s => s.StopTime)
+            .FirstOrDefault();
+
+        if (lastShift == null) return;
+
+        var worked = new TimeSpan(0, 0, lastShift.ElapsedHours, lastShift.ElapsedMinutes, lastShift.ElapsedSeconds);
+        HandoffMetaText.Text = $"By {lastShift.Moderator} · {lastShift.StopTime:yyyy-MM-dd HH:mm} · Worked {worked:hh\\:mm\\:ss}";
+        HandoffSummaryText.Text = string.IsNullOrWhiteSpace(lastShift.SessionSummary)
+            ? "No summary was left for the previous shift."
+            : lastShift.SessionSummary;
+
+        if (!string.IsNullOrWhiteSpace(lastShift.GoodMembers))
         {
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-            if (!File.Exists(path)) return;
-
-            var json = File.ReadAllText(path);
-            var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            if (data?.Shifts == null) return;
-
-            var lastShift = data.Shifts
-                .Where(s => s.StopTime.HasValue && string.Equals(s.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(s => s.StopTime)
-                .FirstOrDefault();
-
-            if (lastShift == null) return;
-
-            var worked = new TimeSpan(0, 0, lastShift.ElapsedHours, lastShift.ElapsedMinutes, lastShift.ElapsedSeconds);
-            HandoffMetaText.Text = $"By {lastShift.Moderator} · {lastShift.StopTime:yyyy-MM-dd HH:mm} · Worked {worked:hh\\:mm\\:ss}";
-            HandoffSummaryText.Text = string.IsNullOrWhiteSpace(lastShift.SessionSummary)
-                ? "No summary was left for the previous shift."
-                : lastShift.SessionSummary;
-
-            if (!string.IsNullOrWhiteSpace(lastShift.GoodMembers))
-            {
-                HandoffGoodMembersText.Text = $"✅ Good members: {lastShift.GoodMembers}";
-                HandoffGoodMembersText.IsVisible = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(lastShift.IssuesToWatch))
-            {
-                HandoffIssuesText.Text = $"⚠ Watch for: {lastShift.IssuesToWatch}";
-                HandoffIssuesText.IsVisible = true;
-            }
-
-            if (lastShift.PerformanceRating > 0 && lastShift.PerformanceRating < RatingLabels.Length)
-            {
-                HandoffRatingText.Text = $"Model mood last shift: {RatingLabels[lastShift.PerformanceRating]}";
-                HandoffRatingText.IsVisible = true;
-            }
+            HandoffGoodMembersText.Text = $"✅ Good members: {lastShift.GoodMembers}";
+            HandoffGoodMembersText.IsVisible = true;
         }
-        catch
+
+        if (!string.IsNullOrWhiteSpace(lastShift.IssuesToWatch))
         {
+            HandoffIssuesText.Text = $"⚠ Watch for: {lastShift.IssuesToWatch}";
+            HandoffIssuesText.IsVisible = true;
+        }
+
+        if (lastShift.PerformanceRating > 0 && lastShift.PerformanceRating < RatingLabels.Length)
+        {
+            HandoffRatingText.Text = $"Model mood last shift: {RatingLabels[lastShift.PerformanceRating]}";
+            HandoffRatingText.IsVisible = true;
         }
     }
 
     private void LoadVipFans()
     {
         VipFansPanel.Children.Clear();
-        try
-        {
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
-            if (!File.Exists(path))
-            {
-                AddNoFansMessage();
-                return;
-            }
 
-            var json = File.ReadAllText(path);
-            var data = JsonSerializer.Deserialize<CrmDataFile>(json);
-            var matches = data?.Records?
-                .Where(r => string.Equals(r.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
-                .ToList() ?? new List<CrmEntry>();
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
+        var data = JsonStore.Load<CrmDataFile>(path);
+        var matches = data?.Records?
+            .Where(r => string.Equals(r.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList() ?? new List<CrmEntry>();
 
-            if (matches.Count == 0)
-            {
-                AddNoFansMessage();
-                return;
-            }
-
-            foreach (var fan in matches)
-            {
-                VipFansPanel.Children.Add(BuildFanRow(fan));
-            }
-        }
-        catch
+        if (matches.Count == 0)
         {
             AddNoFansMessage();
+            return;
+        }
+
+        foreach (var fan in matches)
+        {
+            VipFansPanel.Children.Add(BuildFanRow(fan));
         }
     }
 

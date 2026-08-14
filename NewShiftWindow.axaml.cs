@@ -8,7 +8,6 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using System;
 using System.IO;
-using System.Text.Json;
 
 namespace ModelTimer;
 
@@ -84,117 +83,78 @@ public partial class NewShiftWindow : Window
 
     private void LoadSavedData()
     {
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
+        if (data == null) return;
+
+        if (data.Models != null)
         {
-            if (File.Exists(_dataFilePath))
+            foreach (var model in data.Models)
             {
-                var json = File.ReadAllText(_dataFilePath);
-                var data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-                if (data != null)
-                {
-                    if (data.Models != null)
-                    {
-                        foreach (var model in data.Models)
-                        {
-                            ModelComboBox.Items.Add(model);
-                        }
-                    }
-                    if (data.Moderators != null)
-                    {
-                        foreach (var moderator in data.Moderators)
-                        {
-                            ModeratorComboBox.Items.Add(moderator);
-                        }
-                    }
-                }
+                ModelComboBox.Items.Add(model);
             }
         }
-        catch
+        if (data.Moderators != null)
         {
+            foreach (var moderator in data.Moderators)
+            {
+                ModeratorComboBox.Items.Add(moderator);
+            }
         }
     }
 
     private void SaveData()
     {
-        try
+        var models = new System.Collections.Generic.List<string>();
+        foreach (var item in ModelComboBox.Items)
         {
-            var models = new System.Collections.Generic.List<string>();
-            foreach (var item in ModelComboBox.Items)
-            {
-                if (item is string s) models.Add(s);
-            }
-
-            var moderators = new System.Collections.Generic.List<string>();
-            foreach (var item in ModeratorComboBox.Items)
-            {
-                if (item is string s) moderators.Add(s);
-            }
-
-            ShiftDataFile? existing = null;
-            if (File.Exists(_dataFilePath))
-            {
-                var json = File.ReadAllText(_dataFilePath);
-                existing = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            }
-
-            var data = existing ?? new ShiftDataFile();
-            data.Models = models;
-            data.Moderators = moderators;
-
-            var jsonOut = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_dataFilePath, jsonOut);
+            if (item is string s) models.Add(s);
         }
-        catch
+
+        var moderators = new System.Collections.Generic.List<string>();
+        foreach (var item in ModeratorComboBox.Items)
         {
+            if (item is string s) moderators.Add(s);
         }
+
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath) ?? new ShiftDataFile();
+        data.Models = models;
+        data.Moderators = moderators;
+
+        JsonStore.Save(_dataFilePath, data);
     }
 
     private void SaveShiftHistory()
     {
-        try
+        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath) ?? new ShiftDataFile();
+
+        data.Models ??= new System.Collections.Generic.List<string>();
+        data.Moderators ??= new System.Collections.Generic.List<string>();
+
+        foreach (var item in ModelComboBox.Items)
         {
-            ShiftDataFile? data = null;
-            if (File.Exists(_dataFilePath))
-            {
-                var json = File.ReadAllText(_dataFilePath);
-                data = JsonSerializer.Deserialize<ShiftDataFile>(json);
-            }
-
-            data ??= new ShiftDataFile();
-
-            if (data.Models == null) data.Models = new System.Collections.Generic.List<string>();
-            if (data.Moderators == null) data.Moderators = new System.Collections.Generic.List<string>();
-
-            foreach (var item in ModelComboBox.Items)
-            {
-                if (item is string s && !data.Models.Contains(s)) data.Models.Add(s);
-            }
-            foreach (var item in ModeratorComboBox.Items)
-            {
-                if (item is string s && !data.Moderators.Contains(s)) data.Moderators.Add(s);
-            }
-
-            var entry = new ShiftEntry
-            {
-                Model = ModelComboBox.Text?.Trim() ?? string.Empty,
-                Moderator = ModeratorComboBox.Text?.Trim() ?? string.Empty,
-                Notes = ShiftNotesTextBox.Text ?? string.Empty,
-                DurationHours = HoursComboBox.SelectedItem is int h ? h : 0,
-                DurationMinutes = MinutesComboBox.SelectedItem is int m ? m : 0,
-                StartTime = DateTime.Now,
-                StopTime = null,
-                Timestamp = DateTime.Now
-            };
-
-            data.Shifts ??= new System.Collections.Generic.List<ShiftEntry>();
-            data.Shifts.Add(entry);
-
-            var jsonOut = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_dataFilePath, jsonOut);
+            if (item is string s && !data.Models.Contains(s)) data.Models.Add(s);
         }
-        catch
+        foreach (var item in ModeratorComboBox.Items)
         {
+            if (item is string s && !data.Moderators.Contains(s)) data.Moderators.Add(s);
         }
+
+        var entry = new ShiftEntry
+        {
+            Model = ModelComboBox.Text?.Trim() ?? string.Empty,
+            Moderator = ModeratorComboBox.Text?.Trim() ?? string.Empty,
+            Notes = ShiftNotesTextBox.Text ?? string.Empty,
+            DurationHours = HoursComboBox.SelectedItem is int h ? h : 0,
+            DurationMinutes = MinutesComboBox.SelectedItem is int m ? m : 0,
+            StartTime = DateTime.Now,
+            StopTime = null,
+            Timestamp = DateTime.Now
+        };
+
+        data.Shifts ??= new System.Collections.Generic.List<ShiftEntry>();
+        data.Shifts.Add(entry);
+
+        JsonStore.Save(_dataFilePath, data);
     }
 
     private void UpdateStartButtonState()
