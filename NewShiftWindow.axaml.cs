@@ -293,29 +293,4 @@ public partial class NewShiftWindow : Window
         Close();
     }
 
-    private class ShiftDataFile
-    {
-        public System.Collections.Generic.List<string>? Models { get; set; }
-        public System.Collections.Generic.List<string>? Moderators { get; set; }
-        public System.Collections.Generic.List<ShiftEntry>? Shifts { get; set; }
-    }
-
-    private class ShiftEntry
-    {
-        public string Model { get; set; } = string.Empty;
-        public string Moderator { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
-        public int DurationHours { get; set; }
-        public int DurationMinutes { get; set; }
-        public int ElapsedHours { get; set; }
-        public int ElapsedMinutes { get; set; }
-        public int ElapsedSeconds { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime? StopTime { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string SessionSummary { get; set; } = string.Empty;
-        public string GoodMembers { get; set; } = string.Empty;
-        public string IssuesToWatch { get; set; } = string.Empty;
-        public int PerformanceRating { get; set; }
-    }
 }

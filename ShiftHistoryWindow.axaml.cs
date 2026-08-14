@@ -440,34 +440,4 @@ public partial class ShiftHistoryWindow : Window
         NoDataText.Foreground = new SolidColorBrush(Color.Parse(isLight ? "#FF666666" : "#FF888888"));
     }
 
-    private class AppSettings
-    {
-        public string? Theme { get; set; }
-    }
-
-    private class ShiftDataFile
-    {
-        public List<string>? Models { get; set; }
-        public List<string>? Moderators { get; set; }
-        public List<ShiftEntry>? Shifts { get; set; }
-    }
-
-    private class ShiftEntry
-    {
-        public string Model { get; set; } = string.Empty;
-        public string Moderator { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
-        public int DurationHours { get; set; }
-        public int DurationMinutes { get; set; }
-        public int ElapsedHours { get; set; }
-        public int ElapsedMinutes { get; set; }
-        public int ElapsedSeconds { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime? StopTime { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string SessionSummary { get; set; } = string.Empty;
-        public string GoodMembers { get; set; } = string.Empty;
-        public string IssuesToWatch { get; set; } = string.Empty;
-        public int PerformanceRating { get; set; }
-    }
 }

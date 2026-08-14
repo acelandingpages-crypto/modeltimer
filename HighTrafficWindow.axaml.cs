@@ -19,7 +19,7 @@ namespace ModelTimer;
 public partial class HighTrafficWindow : Window
 {
     private string _dataFilePath = string.Empty;
-    private List<CrmRecord> _records = new();
+    private List<CrmEntry> _records = new();
     private int _nextId = 1;
     private int _editingId = 0;
 
@@ -37,7 +37,7 @@ public partial class HighTrafficWindow : Window
     private void LoadModelsList()
     {
         var shiftDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        var data = JsonStore.Load<ModelsOnlyFile>(shiftDataPath);
+        var data = JsonStore.Load<ShiftDataFile>(shiftDataPath);
         if (data?.Models == null) return;
         foreach (var model in data.Models)
         {
@@ -80,37 +80,20 @@ public partial class HighTrafficWindow : Window
         if (data?.Records == null) return;
         foreach (var r in data.Records.OrderBy(x => x.Id))
         {
-            _records.Add(new CrmRecord
-            {
-                Id = r.Id,
-                User = r.User ?? string.Empty,
-                Model = r.Model ?? string.Empty,
-                Site = r.Site ?? string.Empty,
-                Habits = r.Habits ?? string.Empty,
-                Triggers = r.Triggers ?? string.Empty,
-                Notes = r.Notes ?? string.Empty,
-                CreatedAt = r.CreatedAt
-            });
+            r.User ??= string.Empty;
+            r.Model ??= string.Empty;
+            r.Site ??= string.Empty;
+            r.Habits ??= string.Empty;
+            r.Triggers ??= string.Empty;
+            r.Notes ??= string.Empty;
+            _records.Add(r);
             if (r.Id >= _nextId) _nextId = r.Id + 1;
         }
     }
 
     private void SaveRecords()
     {
-        var data = new CrmDataFile
-        {
-            Records = _records.Select(r => new CrmEntry
-            {
-                Id = r.Id,
-                User = r.User,
-                Model = r.Model,
-                Site = r.Site,
-                Habits = r.Habits,
-                Triggers = r.Triggers,
-                Notes = r.Notes,
-                CreatedAt = r.CreatedAt
-            }).ToList()
-        };
+        var data = new CrmDataFile { Records = _records };
         JsonStore.Save(_dataFilePath, data);
     }
 
@@ -166,7 +149,7 @@ public partial class HighTrafficWindow : Window
         }
     }
 
-    private void AddDataRow(CrmRecord item, int rowIndex)
+    private void AddDataRow(CrmEntry item, int rowIndex)
     {
         TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var bgBrush = rowIndex % 2 == 0
@@ -332,7 +315,7 @@ public partial class HighTrafficWindow : Window
             return;
         }
 
-        _records.Add(new CrmRecord
+        _records.Add(new CrmEntry
         {
             Id = _nextId++,
             User = user,
@@ -455,37 +438,4 @@ public partial class HighTrafficWindow : Window
         Close();
     }
 
-    private class CrmRecord
-    {
-        public int Id { get; set; }
-        public string User { get; set; } = string.Empty;
-        public string Model { get; set; } = string.Empty;
-        public string Site { get; set; } = string.Empty;
-        public string Habits { get; set; } = string.Empty;
-        public string Triggers { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-    }
-
-    private class CrmDataFile
-    {
-        public List<CrmEntry>? Records { get; set; }
-    }
-
-    private class CrmEntry
-    {
-        public int Id { get; set; }
-        public string User { get; set; } = string.Empty;
-        public string Model { get; set; } = string.Empty;
-        public string Site { get; set; } = string.Empty;
-        public string Habits { get; set; } = string.Empty;
-        public string Triggers { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-    }
-
-    private class ModelsOnlyFile
-    {
-        public List<string>? Models { get; set; }
-    }
 }

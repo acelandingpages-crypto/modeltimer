@@ -8,8 +8,8 @@ using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace ModelTimer;
 
@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private string _privateHotkey = "ctrl + p";
     private string _typingHotkey = "ctrl + k";
     private string _activeShiftPath = string.Empty;
+    private bool _closeConfirmed;
 
     public MainWindow()
     {
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
         UpdateShiftStatus();
         UpdateButtonStates();
         PositionChanged += MainWindow_PositionChanged;
+        Closing += MainWindow_Closing;
 
         LoadThemeOnStartup();
 
@@ -64,17 +66,6 @@ public partial class MainWindow : Window
         catch
         {
         }
-    }
-
-    private class AppSettings
-    {
-        public string? Theme { get; set; }
-        public string? ShowHotkey { get; set; }
-        public string? PrivateHotkey { get; set; }
-        public string? TypingHotkey { get; set; }
-        public bool? NotifyOnShiftComplete { get; set; }
-        public bool? Warn5Min { get; set; }
-        public bool? Warn15Min { get; set; }
     }
 
     private void MainWindow_PositionChanged(object? sender, EventArgs e)
@@ -564,6 +555,61 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_closeConfirmed) return;
+
+        e.Cancel = true;
+        var confirmed = await ShowConfirmCloseDialog();
+        if (confirmed)
+        {
+            _closeConfirmed = true;
+            Close();
+        }
+    }
+
+    private async Task<bool> ShowConfirmCloseDialog()
+    {
+        var dialog = new Window
+        {
+            Title = "Close ModelTimer?",
+            Width = 400,
+            Height = 200,
+            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        var message = _isRunning
+            ? "You have an active shift running. Closing will save your progress so you can resume it next time you open ModelTimer.\n\nAre you sure you want to close?"
+            : "Are you sure you want to close ModelTimer?";
+
+        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var btnPanel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center };
+        var cancelBtn = new Button { Content = "Cancel", Width = 100, Height = 30, Background = new SolidColorBrush(Color.Parse("#FFa6e3a1")), Foreground = new SolidColorBrush(Color.Parse("#FF000000")) };
+        var closeBtn = new Button { Content = "Close", Width = 100, Height = 30, Background = new SolidColorBrush(Color.Parse("#FFC42B1C")), Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")) };
+
+        var result = false;
+        cancelBtn.Click += (s, e2) => { result = false; dialog.Close(); };
+        closeBtn.Click += (s, e2) => { result = true; dialog.Close(); };
+
+        btnPanel.Children.Add(cancelBtn);
+        btnPanel.Children.Add(closeBtn);
+        panel.Children.Add(btnPanel);
+        dialog.Content = panel;
+
+        await dialog.ShowDialog(this);
+        return result;
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _timer?.Stop();
@@ -718,38 +764,4 @@ public partial class MainWindow : Window
         ShowStatusImage("show.png", 390, 280);
     }
 
-    private class ShiftDataFile
-    {
-        public List<string>? Models { get; set; }
-        public List<string>? Moderators { get; set; }
-        public List<ShiftEntry>? Shifts { get; set; }
-    }
-
-    private class ShiftEntry
-    {
-        public string Model { get; set; } = string.Empty;
-        public string Moderator { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
-        public int DurationHours { get; set; }
-        public int DurationMinutes { get; set; }
-        public int ElapsedHours { get; set; }
-        public int ElapsedMinutes { get; set; }
-        public int ElapsedSeconds { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime? StopTime { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string SessionSummary { get; set; } = string.Empty;
-        public string GoodMembers { get; set; } = string.Empty;
-        public string IssuesToWatch { get; set; } = string.Empty;
-        public int PerformanceRating { get; set; }
-    }
-
-    private class ActiveShiftState
-    {
-        public string Model { get; set; } = string.Empty;
-        public string Moderator { get; set; } = string.Empty;
-        public long ElapsedSeconds { get; set; }
-        public int DurationHours { get; set; }
-        public int DurationMinutes { get; set; }
-    }
 }

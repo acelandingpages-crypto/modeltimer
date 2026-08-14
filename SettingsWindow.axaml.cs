@@ -224,14 +224,4 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private class AppSettings
-    {
-        public string? Theme { get; set; }
-        public string? ShowHotkey { get; set; }
-        public string? PrivateHotkey { get; set; }
-        public string? TypingHotkey { get; set; }
-        public bool NotifyOnShiftComplete { get; set; }
-        public bool Warn5Min { get; set; }
-        public bool Warn15Min { get; set; }
-    }
 }
