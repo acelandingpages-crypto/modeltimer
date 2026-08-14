@@ -214,26 +214,29 @@ public partial class AskHistoryWindow : Window
         };
     }
 
+    private const int MaxRecordsPerType = 500;
+
     private async void BtnAskAi_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_lastQuery) || (_lastShiftMatches.Count == 0 && _lastCrmMatches.Count == 0))
+        var question = QueryTextBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(question))
         {
-            ShowInfoDialog("Nothing to Summarize", "Search for something first — AI summarizes the matches found below, it doesn't scan everything from scratch.");
+            ShowInfoDialog("Ask AI", "Type a question above first — e.g. \"which model brought in the most hours this month?\" or \"who are our top spenders on Chaturbate?\"");
             return;
         }
 
         var settings = JsonStore.Load<AppSettings>(_settingsPath);
         if (!AiSummaryService.IsConfigured(settings))
         {
-            ShowInfoDialog("AI Answering Not Set Up", "Add a provider and API key under Settings to get an AI-written summary of these matches. The results above are already found by keyword search.");
+            ShowInfoDialog("AI Answering Not Set Up", "Add a provider and API key under Settings to ask questions over the full shift/CRM history. The keyword search above works without AI.");
             return;
         }
 
         try
         {
             BtnAskAi.IsEnabled = false;
-            var context = BuildContext();
-            var answer = await AiSummaryService.AskAsync(settings!, _lastQuery, context);
+            var database = BuildFullDatabaseContext();
+            var answer = await AiSummaryService.AskAsync(settings!, question, database);
             AiAnswerText.Text = answer;
             AiAnswerBorder.IsVisible = true;
         }
@@ -247,17 +250,35 @@ public partial class AskHistoryWindow : Window
         }
     }
 
-    private string BuildContext()
+    private string BuildFullDatabaseContext()
     {
+        var shiftData = JsonStore.Load<ShiftDataFile>(_shiftDataPath);
+        var crmData = JsonStore.Load<CrmDataFile>(_crmDataPath);
+
+        var shifts = (shiftData?.Shifts ?? new List<ShiftEntry>())
+            .OrderByDescending(s => s.Timestamp)
+            .Take(MaxRecordsPerType)
+            .ToList();
+        var fans = (crmData?.Records ?? new List<CrmEntry>())
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(MaxRecordsPerType)
+            .ToList();
+
         var sb = new StringBuilder();
-        foreach (var s in _lastShiftMatches)
+        sb.AppendLine($"SHIFTS ({shifts.Count} of {shiftData?.Shifts?.Count ?? 0} total, most recent first):");
+        foreach (var s in shifts)
         {
-            sb.AppendLine($"Shift — {s.Model} / {s.Moderator} / {s.Timestamp:yyyy-MM-dd}: {s.SessionSummary} | Good: {s.GoodMembers} | Issues: {s.IssuesToWatch} | Notes: {s.Notes}");
+            var worked = new TimeSpan(0, 0, s.ElapsedHours, s.ElapsedMinutes, s.ElapsedSeconds);
+            sb.AppendLine($"- {s.Timestamp:yyyy-MM-dd} | Model: {s.Model} | Moderator: {s.Moderator} | Worked: {worked:hh\\:mm\\:ss} | Rating: {s.PerformanceRating}/5 | Summary: {s.SessionSummary} | Good members: {s.GoodMembers} | Issues: {s.IssuesToWatch}");
         }
-        foreach (var r in _lastCrmMatches)
+
+        sb.AppendLine();
+        sb.AppendLine($"FANS/CRM ({fans.Count} of {crmData?.Records?.Count ?? 0} total, most recently touched first):");
+        foreach (var r in fans)
         {
-            sb.AppendLine($"Fan — {r.User} / {r.Site} / {r.Model}: Habits: {r.Habits} | Triggers: {r.Triggers} | Notes: {r.Notes}");
+            sb.AppendLine($"- {r.CreatedAt:yyyy-MM-dd} | User: {r.User} | Site: {r.Site} | Model: {r.Model} | SpendTier: {r.SpendTier}/5 | Habits: {r.Habits} | Triggers: {r.Triggers} | Notes: {r.Notes}");
         }
+
         return sb.ToString();
     }
 

@@ -26,12 +26,12 @@
     <!-- Search bar -->
     <Border Grid.Row="1" Padding="16,14,16,14" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
       <StackPanel Spacing="8">
-        <TextBlock Text="Search shift reports and fan CRM notes" Foreground="White" FontSize="13" FontWeight="Bold"/>
+        <TextBlock Text="Search by keyword, or ask AI a question in plain language" Foreground="White" FontSize="13" FontWeight="Bold"/>
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <TextBox Grid.Column="0" Name="QueryTextBox" PlaceholderText="e.g. Aria, refund, chargeback..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8" Height="34" KeyDown="QueryTextBox_KeyDown"/>
+          <TextBox Grid.Column="0" Name="QueryTextBox" PlaceholderText="e.g. Aria, refund — or ask: which model earned the most hours this month?" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8" Height="34" KeyDown="QueryTextBox_KeyDown"/>
           <Button Grid.Column="1" Name="BtnSearch" Content="Search" Height="34" Width="90" Background="#FFa6e3a1" Foreground="Black" Click="BtnSearch_Click"/>
         </Grid>
-        <Button Name="BtnAskAi" Content="✨ Ask AI to summarize these matches" Height="30" Background="#FF3E3E42" Foreground="White" FontSize="12" HorizontalAlignment="Stretch" Click="BtnAskAi_Click"/>
+        <Button Name="BtnAskAi" Content="✨ Ask AI about the full shift &amp; CRM history" Height="30" Background="#FF3E3E42" Foreground="White" FontSize="12" HorizontalAlignment="Stretch" Click="BtnAskAi_Click"/>
         <Border Name="AiAnswerBorder" Background="#FF1E1E1E" BorderBrush="#FFcba6f7" BorderThickness="1" CornerRadius="6" Padding="10" IsVisible="False">
           <TextBlock Name="AiAnswerText" Text="" Foreground="#FFa6e3a1" FontSize="13" TextWrapping="Wrap"/>
         </Border>
