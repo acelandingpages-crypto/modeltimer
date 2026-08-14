@@ -64,4 +64,5 @@ public class CrmEntry
     public string Triggers { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public int SpendTier { get; set; }
 }

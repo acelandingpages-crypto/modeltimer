@@ -30,18 +30,23 @@ public partial class ActivityWindow : Window
     private double _panOffsetStartX;
     private List<DateTime> _lastChartDates = new();
     private List<double> _lastChartValues = new();
+    private string _crmDataFilePath = string.Empty;
+    private List<CrmEntry> _crmRecords = new();
+    private static readonly string[] SpendTierLabels = { "-", "$", "$$", "$$$", "$$$$", "$$$$$" };
 
     public ActivityWindow()
     {
         InitializeComponent();
         _dataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
+        _crmDataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
         LoadShiftHistory();
+        LoadCrmRecords();
 
         FromDatePicker.SelectedDateChanged += FromDatePicker_SelectedDateChanged;
         ToDatePicker.SelectedDateChanged += ToDatePicker_SelectedDateChanged;
         ModeratorComboBox.SelectionChanged += (s, e) => RefreshDashboard();
         BtnApply.Click += (s, e) => RefreshDashboard();
-        BtnRefresh.Click += (s, e) => { LoadShiftHistory(); RefreshDashboard(); };
+        BtnRefresh.Click += (s, e) => { LoadShiftHistory(); LoadCrmRecords(); RefreshDashboard(); };
         BtnClear.Click += (s, e) =>
         {
             _isInitializing = true;
@@ -150,6 +155,8 @@ public partial class ActivityWindow : Window
             DaysTrackedText.Text = "0";
             NoChartText.IsVisible = true;
             ChartCanvas.Children.Clear();
+            _filteredShifts = new List<ShiftHistoryItem>();
+            RefreshInsights();
             return;
         }
 
@@ -175,6 +182,7 @@ public partial class ActivityWindow : Window
             DaysTrackedText.Text = "0";
             NoChartText.IsVisible = true;
             ChartCanvas.Children.Clear();
+            RefreshInsights();
             return;
         }
 
@@ -209,8 +217,9 @@ public partial class ActivityWindow : Window
         var dataMax = dailyTotals.DefaultIfEmpty(0).Max();
         if (dataMax <= 0) dataMax = 0.1;
         _yAxisMax = dataMax;
-        
+
         DrawChart();
+        RefreshInsights();
     }
 
     private void BtnApply_Click(object sender, RoutedEventArgs e)
@@ -634,6 +643,91 @@ public partial class ActivityWindow : Window
 
             _allShifts.Add(item);
         }
+    }
+
+    private void LoadCrmRecords()
+    {
+        _crmRecords.Clear();
+        var data = JsonStore.Load<CrmDataFile>(_crmDataFilePath);
+        if (data?.Records == null) return;
+        _crmRecords.AddRange(data.Records);
+    }
+
+    private void RefreshInsights()
+    {
+        TopSpendersPanel.Children.Clear();
+        ChurnRiskPanel.Children.Clear();
+        BestSlotsPanel.Children.Clear();
+
+        var topSpenders = _crmRecords
+            .Where(r => r.SpendTier > 0)
+            .OrderByDescending(r => r.SpendTier)
+            .ThenByDescending(r => r.CreatedAt)
+            .Take(5)
+            .ToList();
+
+        if (topSpenders.Count == 0)
+        {
+            AddInsightRow(TopSpendersPanel, "No spend-tier fans tagged yet.", "#FF888888");
+        }
+        else
+        {
+            foreach (var fan in topSpenders)
+            {
+                var tier = SpendTierLabels[Math.Clamp(fan.SpendTier, 0, SpendTierLabels.Length - 1)];
+                AddInsightRow(TopSpendersPanel, $"{fan.User} ({fan.Model}) — {tier}", "#FFFFFFFF");
+            }
+        }
+
+        var churnCutoff = DateTime.Now.AddDays(-14);
+        var churnRisk = _crmRecords
+            .Where(r => r.CreatedAt < churnCutoff)
+            .OrderBy(r => r.CreatedAt)
+            .Take(5)
+            .ToList();
+
+        if (churnRisk.Count == 0)
+        {
+            AddInsightRow(ChurnRiskPanel, "No fans overdue for a check-in.", "#FF888888");
+        }
+        else
+        {
+            foreach (var fan in churnRisk)
+            {
+                var daysAgo = (int)(DateTime.Now - fan.CreatedAt).TotalDays;
+                AddInsightRow(ChurnRiskPanel, $"{fan.User} ({fan.Model}) — {daysAgo}d since last touch", "#FFFFFFFF");
+            }
+        }
+
+        var bestDays = _filteredShifts
+            .GroupBy(s => s.Timestamp.DayOfWeek)
+            .Select(g => new { Day = g.Key, Hours = g.Sum(GetDurationHours) })
+            .OrderByDescending(x => x.Hours)
+            .Take(3)
+            .ToList();
+
+        if (bestDays.Count == 0)
+        {
+            AddInsightRow(BestSlotsPanel, "No shift data in range.", "#FF888888");
+        }
+        else
+        {
+            foreach (var d in bestDays)
+            {
+                AddInsightRow(BestSlotsPanel, $"{d.Day} — {FormatDuration(d.Hours)} logged", "#FFFFFFFF");
+            }
+        }
+    }
+
+    private void AddInsightRow(StackPanel panel, string text, string colorHex)
+    {
+        panel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = new SolidColorBrush(Color.Parse(colorHex)),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap
+        });
     }
 
     private void ApplyTheme()

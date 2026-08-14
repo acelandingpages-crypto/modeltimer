@@ -18,6 +18,8 @@ namespace ModelTimer;
 
 public partial class HighTrafficWindow : Window
 {
+    private static readonly string[] SpendTierLabels = { "-", "$", "$$", "$$$", "$$$$", "$$$$$" };
+
     private string _dataFilePath = string.Empty;
     private List<CrmEntry> _records = new();
     private int _nextId = 1;
@@ -125,7 +127,7 @@ public partial class HighTrafficWindow : Window
     private void AddHeaderRow()
     {
         TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var headers = new[] { "User", "Model", "Site", "Spend Habits", "Triggers", "Notes", "Action" };
+        var headers = new[] { "User", "Model", "Site", "Spend", "Habits", "Triggers", "Notes", "Action" };
         for (int col = 0; col < headers.Length; col++)
         {
             var border = new Border
@@ -156,7 +158,7 @@ public partial class HighTrafficWindow : Window
             ? new SolidColorBrush(Color.Parse("#FF2D2D30"))
             : new SolidColorBrush(Color.Parse("#FF252526"));
 
-        var cells = new[] { item.User, item.Model, item.Site, item.Habits, item.Triggers, item.Notes };
+        var cells = new[] { item.User, item.Model, item.Site, SpendTierLabels[Math.Clamp(item.SpendTier, 0, SpendTierLabels.Length - 1)], item.Habits, item.Triggers, item.Notes };
 
         for (int col = 0; col < cells.Length; col++)
         {
@@ -168,7 +170,7 @@ public partial class HighTrafficWindow : Window
                 Padding = new Thickness(6)
             };
 
-            if (col == 5)
+            if (col == 6)
             {
                 var text = new SelectableTextBlock
                 {
@@ -256,7 +258,7 @@ public partial class HighTrafficWindow : Window
         
         actionBorder.Child = actionGrid;
         Grid.SetRow(actionBorder, rowIndex);
-        Grid.SetColumn(actionBorder, 6);
+        Grid.SetColumn(actionBorder, 7);
         TableGrid.Children.Add(actionBorder);
     }
 
@@ -274,6 +276,7 @@ public partial class HighTrafficWindow : Window
         HabitsTextBox.Text = item.Habits;
         TriggersTextBox.Text = item.Triggers;
         NotesTextBox.Text = item.Notes;
+        SpendTierComboBox.SelectedIndex = Math.Clamp(item.SpendTier, 0, SpendTierComboBox.ItemCount - 1);
     }
 
     private void DeleteButton_Click(object? sender, RoutedEventArgs e)
@@ -292,6 +295,7 @@ public partial class HighTrafficWindow : Window
         TriggersTextBox.Text = string.Empty;
         NotesTextBox.Text = string.Empty;
         PlatformComboBox.SelectedIndex = 0;
+        SpendTierComboBox.SelectedIndex = 0;
     }
 
     private void BtnSaveProfile_Click(object sender, RoutedEventArgs e)
@@ -303,6 +307,7 @@ public partial class HighTrafficWindow : Window
         var habits = HabitsTextBox.Text?.Trim() ?? string.Empty;
         var triggers = TriggersTextBox.Text?.Trim() ?? string.Empty;
         var notes = NotesTextBox.Text?.Trim() ?? string.Empty;
+        var spendTier = SpendTierComboBox.SelectedIndex;
 
         if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(siteText))
         {
@@ -324,7 +329,8 @@ public partial class HighTrafficWindow : Window
             Habits = habits,
             Triggers = triggers,
             Notes = notes,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.Now,
+            SpendTier = spendTier
         });
 
         SaveRecords();
@@ -334,6 +340,7 @@ public partial class HighTrafficWindow : Window
         TriggersTextBox.Text = string.Empty;
         NotesTextBox.Text = string.Empty;
         PlatformComboBox.SelectedIndex = 0;
+        SpendTierComboBox.SelectedIndex = 0;
         _editingId = 0;
         RefreshTable();
     }
@@ -347,6 +354,7 @@ public partial class HighTrafficWindow : Window
         var habits = HabitsTextBox.Text?.Trim() ?? string.Empty;
         var triggers = TriggersTextBox.Text?.Trim() ?? string.Empty;
         var notes = NotesTextBox.Text?.Trim() ?? string.Empty;
+        var spendTier = SpendTierComboBox.SelectedIndex;
 
         if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(siteText))
         {
@@ -366,6 +374,7 @@ public partial class HighTrafficWindow : Window
         existing.Triggers = triggers;
         existing.Notes = notes;
         existing.CreatedAt = DateTime.Now;
+        existing.SpendTier = spendTier;
 
         SaveRecords();
         UserTextBox.Text = string.Empty;
@@ -374,6 +383,7 @@ public partial class HighTrafficWindow : Window
         TriggersTextBox.Text = string.Empty;
         NotesTextBox.Text = string.Empty;
         PlatformComboBox.SelectedIndex = 0;
+        SpendTierComboBox.SelectedIndex = 0;
         _editingId = 0;
         RefreshTable();
     }

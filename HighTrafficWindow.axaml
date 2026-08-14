@@ -60,14 +60,23 @@
             <Button Grid.Column="6" Name="BtnSaveProfile" Content="Save" Height="32" Background="#FFa6e3a1" Foreground="Black" VerticalAlignment="Center" Click="BtnSaveProfile_Click"/>
             <Button Grid.Column="7" Name="BtnUpdateProfile" Content="Update" Height="32" Background="#FFcba6f7" Foreground="Black" VerticalAlignment="Center" Click="BtnUpdateProfile_Click"/>
           </Grid>
-          <!-- Form Row 2: Habits, Triggers, Notes on one line -->
-          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="6">
+          <!-- Form Row 2: Habits, Triggers, Notes, Spend Tier -->
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,Auto" ColumnSpacing="6">
             <TextBlock Grid.Column="0" Text="Habits:" Foreground="White" VerticalAlignment="Center"/>
             <TextBox Grid.Column="1" Name="HabitsTextBox" PlaceholderText="e.g. Wheel Spins, Big Pvt Shows..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
             <TextBlock Grid.Column="2" Text="Triggers:" Foreground="White" VerticalAlignment="Center"/>
             <TextBox Grid.Column="3" Name="TriggersTextBox" PlaceholderText="Triggers: Likes dirty talk, control, feet..." Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
             <TextBlock Grid.Column="4" Text="Notes:" Foreground="White" VerticalAlignment="Center"/>
             <TextBox Grid.Column="5" Name="NotesTextBox" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="6" Text="Spend:" Foreground="White" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="7" Name="SpendTierComboBox" Width="110" Height="26" Background="#FF3E3E42" Foreground="White" VerticalAlignment="Center" SelectedIndex="0">
+              <ComboBoxItem Content="Not set"/>
+              <ComboBoxItem Content="$ Low"/>
+              <ComboBoxItem Content="$$ Medium"/>
+              <ComboBoxItem Content="$$$ High"/>
+              <ComboBoxItem Content="$$$$ VIP"/>
+              <ComboBoxItem Content="$$$$$ Whale"/>
+            </ComboBox>
           </Grid>
         </Grid>
       </Border>
@@ -77,7 +86,7 @@
     <Border Grid.Row="2" Padding="10" Background="#FF1E1E1E">
       <Grid RowDefinitions="*,Auto">
         <ScrollViewer Grid.Row="0" Name="TableScrollViewer">
-          <Grid Name="TableGrid" ColumnDefinitions="120,100,100,*,*,*,120"/>
+          <Grid Name="TableGrid" ColumnDefinitions="120,100,100,70,*,*,*,120"/>
         </ScrollViewer>
         <TextBlock Grid.Row="1" Name="NoDataText" Text="No records found." Foreground="#FF888888" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0" IsVisible="False"/>
       </Grid>
