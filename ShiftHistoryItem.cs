@@ -16,6 +16,10 @@ public class ShiftHistoryItem
     public int ElapsedHours { get; set; }
     public int ElapsedMinutes { get; set; }
     public int ElapsedSeconds { get; set; }
+    public string SessionSummary { get; set; } = string.Empty;
+    public string GoodMembers { get; set; } = string.Empty;
+    public string IssuesToWatch { get; set; } = string.Empty;
+    public int PerformanceRating { get; set; }
 
     public string Date => Timestamp.ToString("yyyy-MM-dd");
     public string StartTimeDisplay => StartTime.ToString("HH:mm");

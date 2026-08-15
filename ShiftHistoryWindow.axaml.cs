@@ -160,7 +160,11 @@ public partial class ShiftHistoryWindow : Window
                 DurationMinutes = entry.DurationMinutes,
                 ElapsedHours = entry.ElapsedHours,
                 ElapsedMinutes = entry.ElapsedMinutes,
-                ElapsedSeconds = entry.ElapsedSeconds
+                ElapsedSeconds = entry.ElapsedSeconds,
+                SessionSummary = entry.SessionSummary ?? string.Empty,
+                GoodMembers = entry.GoodMembers ?? string.Empty,
+                IssuesToWatch = entry.IssuesToWatch ?? string.Empty,
+                PerformanceRating = entry.PerformanceRating
             };
 
             _allShifts.Add(item);
@@ -213,7 +217,7 @@ public partial class ShiftHistoryWindow : Window
     {
         TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var headers = new[] { "No", "Model", "Moderator", "Date", "Start Time", "Stop Time", "Duration", "Notes", "Delete" };
+        var headers = new[] { "No", "Model", "Moderator", "Date", "Start Time", "Stop Time", "Duration", "Notes", "Edit", "Delete" };
         for (int col = 0; col < headers.Length; col++)
         {
             var border = new Border
@@ -255,6 +259,7 @@ public partial class ShiftHistoryWindow : Window
             item.StopTimeDisplay,
             item.DurationDisplay,
             item.Notes,
+            "Edit",
             "Delete"
         };
 
@@ -269,6 +274,20 @@ public partial class ShiftHistoryWindow : Window
             };
 
             if (col == 8)
+            {
+                var btn = new Button
+                {
+                    Content = "Edit",
+                    Tag = item.Id,
+                    Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
+                    Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
+                    Padding = new Thickness(5, 2),
+                    Height = 25
+                };
+                btn.Click += EditButton_Click;
+                border.Child = btn;
+            }
+            else if (col == 9)
             {
                 var btn = new Button
                 {
@@ -398,6 +417,33 @@ public partial class ShiftHistoryWindow : Window
                 if (_maxDate.HasValue) ToDatePicker.SelectedDate = _maxDate.Value;
             }
 
+            RefreshTable();
+        }
+    }
+
+    private async void EditButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int id) return;
+
+        var item = _filteredShifts.FirstOrDefault(s => s.Id == id);
+        if (item == null) return;
+
+        var elapsed = new TimeSpan(0, item.ElapsedHours, item.ElapsedMinutes, item.ElapsedSeconds);
+        var editWindow = new EditShiftReportWindow(
+            item.Model,
+            item.Moderator,
+            item.Timestamp,
+            elapsed,
+            item.SessionSummary,
+            item.GoodMembers,
+            item.IssuesToWatch,
+            item.PerformanceRating);
+
+        await editWindow.ShowDialog(this);
+
+        if (editWindow.Saved)
+        {
+            LoadShiftHistory();
             RefreshTable();
         }
     }
