@@ -65,12 +65,15 @@ internal static class AiSummaryService
     public static async Task<string> PolishSummaryAsync(AppSettings settings, string model, string moderator, TimeSpan elapsed, string moderatorNotes)
     {
         var prompt =
-            "You are helping a content-moderation studio moderator clean up their own end-of-shift handoff note " +
-            "so the next moderator on this model can read it quickly. Rewrite the RAW NOTES below into clear, " +
-            "professional, business-appropriate language for the handoff. Preserve every fact, name, and detail " +
-            "exactly as given - do not invent, assume, or add any information that isn't in the raw notes. Do not " +
-            "pad a short note with generic filler; if the notes are brief, the polished version should be brief " +
-            "too. First person, 2-6 sentences, no headers, no bullet points, no signature line.\n\n" +
+            "You are helping a content-moderation studio moderator turn their own shift notes into a handoff " +
+            "note for whoever works this model next. Rewrite the RAW NOTES below into a single natural, " +
+            "well-organized paragraph - no labels, no headers, no bullet points. A good handoff paragraph reads " +
+            "smoothly but still makes it easy to pick out three things at a glance: how the shift/model went " +
+            "overall, anything notable worth flagging, and anything the next moderator specifically needs to " +
+            "watch for or do. Only cover what the raw notes actually contain - do not invent facts, and do not " +
+            "force a mention of something the notes never touched on just to fill out the shape. Preserve every " +
+            "fact, name, and detail exactly as given. If the notes are brief, the paragraph should stay brief " +
+            "too - do not pad it with filler. First person, 2-5 sentences, no signature line.\n\n" +
             $"Context (for tone only, not to be added as new facts): Model: {model} | Moderator: {moderator} | Time worked: {elapsed:hh\\:mm\\:ss}\n\n" +
             $"RAW NOTES:\n{moderatorNotes}";
 
