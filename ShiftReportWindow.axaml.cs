@@ -51,7 +51,9 @@ public partial class ShiftReportWindow : Window
 
     private void SummaryTextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
-        BtnSubmit.IsEnabled = !string.IsNullOrWhiteSpace(SummaryTextBox.Text);
+        var hasText = !string.IsNullOrWhiteSpace(SummaryTextBox.Text);
+        BtnSubmit.IsEnabled = hasText;
+        BtnDraftAi.IsVisible = hasText;
     }
 
     private void BtnSubmit_Click(object sender, RoutedEventArgs e)
@@ -94,28 +96,38 @@ public partial class ShiftReportWindow : Window
 
     private async void BtnDraftAi_Click(object sender, RoutedEventArgs e)
     {
+        var notes = SummaryTextBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            ShowInfoDialog("Nothing to Polish", "Write your own notes on how the shift went first — AI polishes what you wrote, it doesn't invent a summary from nothing.");
+            return;
+        }
+
         var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
         var settings = JsonStore.Load<AppSettings>(settingsPath);
 
         if (!AiSummaryService.IsConfigured(settings))
         {
-            ShowInfoDialog("AI Drafting Not Set Up", "Add a provider and API key under Settings to enable AI-drafted summaries. For now, write this one yourself.");
+            ShowInfoDialog("AI Polishing Not Set Up", "Add a provider and API key under Settings to enable AI polishing. Your own notes above will still be saved as-is.");
             return;
         }
 
+        var originalContent = BtnDraftAi.Content;
         try
         {
             BtnDraftAi.IsEnabled = false;
-            var draft = await AiSummaryService.DraftSummaryAsync(settings!, _model, _moderator, _elapsed);
-            SummaryTextBox.Text = draft;
+            BtnDraftAi.Content = "Polishing...";
+            var polished = await AiSummaryService.PolishSummaryAsync(settings!, _model, _moderator, _elapsed, notes);
+            SummaryTextBox.Text = polished;
         }
         catch (Exception ex)
         {
-            ShowInfoDialog("AI Drafting Unavailable", ex.Message);
+            ShowInfoDialog("AI Polishing Unavailable", ex.Message);
         }
         finally
         {
             BtnDraftAi.IsEnabled = true;
+            BtnDraftAi.Content = originalContent;
         }
     }
 

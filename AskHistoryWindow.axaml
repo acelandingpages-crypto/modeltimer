@@ -32,8 +32,8 @@
           <Button Grid.Column="1" Name="BtnSearch" Content="Search" Height="34" Width="90" Background="#FFa6e3a1" Foreground="Black" Click="BtnSearch_Click"/>
         </Grid>
         <Button Name="BtnAskAi" Content="✨ Ask AI about the full shift &amp; CRM history" Height="30" Background="#FF3E3E42" Foreground="White" FontSize="12" HorizontalAlignment="Stretch" Click="BtnAskAi_Click"/>
-        <Border Name="AiAnswerBorder" Background="#FF1E1E1E" BorderBrush="#FFcba6f7" BorderThickness="1" CornerRadius="6" Padding="10" IsVisible="False">
-          <TextBlock Name="AiAnswerText" Text="" Foreground="#FFa6e3a1" FontSize="13" TextWrapping="Wrap"/>
+        <Border Name="AiAnswerBorder" Background="#FF1E1E1E" BorderBrush="#FFcba6f7" BorderThickness="1" CornerRadius="6" Padding="12" IsVisible="False">
+          <StackPanel Name="AiAnswerPanel" Spacing="6"/>
         </Border>
       </StackPanel>
     </Border>

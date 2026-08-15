@@ -28,7 +28,7 @@
         <StackPanel Spacing="6">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Text="Session summary (required)" Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Name="BtnDraftAi" Content="✨ Draft with AI" Height="26" Padding="8,0" Background="#FF3E3E42" Foreground="White" FontSize="11" Click="BtnDraftAi_Click"/>
+            <Button Grid.Column="1" Name="BtnDraftAi" Content="✨ Polish with AI" Height="26" Padding="8,0" Background="#FF3E3E42" Foreground="White" FontSize="11" IsVisible="False" Click="BtnDraftAi_Click"/>
           </Grid>
           <TextBox Name="SummaryTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="8"
                     PlaceholderText="How did the shift go overall?" TextChanged="SummaryTextBox_TextChanged"/>
