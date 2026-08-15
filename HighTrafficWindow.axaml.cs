@@ -388,6 +388,109 @@ public partial class HighTrafficWindow : Window
         RefreshTable();
     }
 
+    private async void BtnSuggestTag_Click(object sender, RoutedEventArgs e)
+    {
+        var user = UserTextBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(user))
+        {
+            ShowInfoDialog("Suggest Tier & Check Duplicates", "Type a username first, then try again.");
+            return;
+        }
+
+        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (!AiSummaryService.IsConfigured(settings))
+        {
+            ShowInfoDialog("AI Not Set Up", "Add a provider and API key under Settings to enable tier suggestions and duplicate checks.");
+            return;
+        }
+
+        var habits = HabitsTextBox.Text?.Trim() ?? string.Empty;
+        var triggers = TriggersTextBox.Text?.Trim() ?? string.Empty;
+        var notes = NotesTextBox.Text?.Trim() ?? string.Empty;
+        var existingUsers = _records
+            .Where(r => r.Id != _editingId)
+            .Select(r => r.User)
+            .Where(u => !string.IsNullOrWhiteSpace(u))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var originalContent = BtnSuggestTag.Content;
+        try
+        {
+            BtnSuggestTag.IsEnabled = false;
+            BtnSuggestTag.Content = "Checking...";
+
+            var suggestion = await AiSummaryService.SuggestFanTagAsync(settings!, user, habits, triggers, notes, existingUsers);
+
+            var appliedTier = false;
+            if (suggestion.SuggestedTier is >= 1 and <= 5 && SpendTierComboBox.SelectedIndex == 0)
+            {
+                SpendTierComboBox.SelectedIndex = suggestion.SuggestedTier;
+                appliedTier = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(suggestion.LikelyDuplicateOf))
+            {
+                ShowInfoDialog("Possible Duplicate", $"This looks similar to an existing record for \"{suggestion.LikelyDuplicateOf}\" — check before saving to avoid a duplicate fan entry.");
+            }
+            else if (appliedTier)
+            {
+                ShowInfoDialog("Suggested Tier Applied", $"Set spend tier to {SpendTierLabels[suggestion.SuggestedTier]} based on the habits/triggers/notes text. No likely duplicates found.");
+            }
+            else
+            {
+                ShowInfoDialog("No Suggestions", "AI didn't find a confident tier suggestion or a likely duplicate. Nothing changed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowInfoDialog("AI Unavailable", ex.Message);
+        }
+        finally
+        {
+            BtnSuggestTag.IsEnabled = true;
+            BtnSuggestTag.Content = originalContent;
+        }
+    }
+
+    private void ShowInfoDialog(string title, string message)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 380,
+            Height = 190,
+            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Width = 100,
+            Height = 30,
+            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
+            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+        };
+        okBtn.Click += (s, e) => dialog.Close();
+
+        panel.Children.Add(okBtn);
+        dialog.Content = panel;
+        dialog.ShowDialog(this);
+    }
+
     private void ShowNotesPopup(string notes)
     {
         var popup = new Window

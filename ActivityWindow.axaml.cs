@@ -610,6 +610,117 @@ public partial class ActivityWindow : Window
         Close();
     }
 
+    private async void BtnSuggestCoverage_Click(object sender, RoutedEventArgs e)
+    {
+        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        if (!AiSummaryService.IsConfigured(settings))
+        {
+            ShowInfoDialog("AI Not Set Up", "Add a provider and API key under Settings to get coverage suggestions.");
+            return;
+        }
+
+        if (!_allShifts.Any())
+        {
+            ShowInfoDialog("Suggest Coverage", "No shift history yet to base a suggestion on.");
+            return;
+        }
+
+        var originalContent = BtnSuggestCoverage.Content;
+        try
+        {
+            BtnSuggestCoverage.IsEnabled = false;
+            BtnSuggestCoverage.Content = "Thinking...";
+            CoverageAnswerPanel.Children.Clear();
+            CoverageAnswerPanel.Children.Add(new TextBlock
+            {
+                Text = "Analyzing coverage, hang on...",
+                Foreground = new SolidColorBrush(Color.Parse("#FFa6e3a1")),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap
+            });
+            CoverageAnswerBorder.IsVisible = true;
+
+            var context = BuildCoverageContext();
+            const string question = "Based on this shift coverage data (hours worked, grouped by day of week and " +
+                "by moderator), which day(s) of the week are under-covered relative to the others, and which " +
+                "moderator would make sense to schedule there based on their existing pattern? Be specific and practical.";
+
+            var result = await AiSummaryService.AskAsync(settings!, question, context);
+            AskResultRenderer.Render(CoverageAnswerPanel, result);
+        }
+        catch (Exception ex)
+        {
+            CoverageAnswerBorder.IsVisible = false;
+            ShowInfoDialog("AI Unavailable", ex.Message);
+        }
+        finally
+        {
+            BtnSuggestCoverage.IsEnabled = true;
+            BtnSuggestCoverage.Content = originalContent;
+        }
+    }
+
+    private string BuildCoverageContext()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("HOURS WORKED BY DAY OF WEEK (all moderators combined):");
+        foreach (var day in Enum.GetValues<DayOfWeek>())
+        {
+            var hours = _allShifts.Where(s => s.Timestamp.DayOfWeek == day).Sum(GetDurationHours);
+            sb.AppendLine($"- {day}: {hours:0.0} hrs");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("HOURS WORKED BY MODERATOR, BROKEN DOWN BY DAY OF WEEK:");
+        foreach (var modGroup in _allShifts.GroupBy(s => s.Moderator))
+        {
+            var byDay = modGroup.GroupBy(s => s.Timestamp.DayOfWeek)
+                .Select(g => $"{g.Key}: {g.Sum(GetDurationHours):0.0}h")
+                .ToList();
+            sb.AppendLine($"- {modGroup.Key}: {string.Join(", ", byDay)}");
+        }
+
+        return sb.ToString();
+    }
+
+    private void ShowInfoDialog(string title, string message)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 380,
+            Height = 190,
+            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Width = 100,
+            Height = 30,
+            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
+            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+        };
+        okBtn.Click += (s, e) => dialog.Close();
+
+        panel.Children.Add(okBtn);
+        dialog.Content = panel;
+        dialog.ShowDialog(this);
+    }
+
     private void LoadShiftHistory()
     {
         _allShifts.Clear();

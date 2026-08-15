@@ -26,6 +26,18 @@ internal class AskChartPoint
     public double Value { get; set; }
 }
 
+internal class RiskFlagResult
+{
+    public bool HasPattern { get; set; }
+    public string Summary { get; set; } = string.Empty;
+}
+
+internal class FanTagSuggestion
+{
+    public int SuggestedTier { get; set; }
+    public string LikelyDuplicateOf { get; set; } = string.Empty;
+}
+
 internal static class AiSummaryService
 {
     private const string AnthropicModel = "claude-opus-5";
@@ -53,6 +65,30 @@ internal static class AiSummaryService
         }
       },
       "required": ["headline", "details", "chart_title", "chart"],
+      "additionalProperties": false
+    }
+    """;
+
+    private const string RiskJsonSchema = """
+    {
+      "type": "object",
+      "properties": {
+        "has_pattern": { "type": "boolean" },
+        "summary": { "type": "string" }
+      },
+      "required": ["has_pattern", "summary"],
+      "additionalProperties": false
+    }
+    """;
+
+    private const string FanTagJsonSchema = """
+    {
+      "type": "object",
+      "properties": {
+        "suggested_tier": { "type": "integer" },
+        "likely_duplicate_of": { "type": "string" }
+      },
+      "required": ["suggested_tier", "likely_duplicate_of"],
       "additionalProperties": false
     }
     """;
@@ -98,21 +134,76 @@ internal static class AiSummaryService
             "invent numbers, names, or a chart the data doesn't actually support.\n\n" +
             $"DATA:\n{databaseJson}\n\nQUESTION: {question}";
 
-        var raw = await SendJsonAsync(settings, prompt, 1500);
+        var raw = await SendJsonAsync(settings, prompt, 1500, AskJsonSchema);
         return ParseAskResult(raw);
+    }
+
+    public static async Task<RiskFlagResult> CheckRiskPatternAsync(AppSettings settings, string model, string context)
+    {
+        var prompt =
+            "You are reviewing recent shift issue notes and fan triggers for a content-moderation model to spot a " +
+            "genuinely recurring problem worth flagging to the next moderator before their shift starts. Only flag " +
+            "a REAL recurring pattern - the same or closely related issue appearing more than once across " +
+            "different shifts or fans. A single one-off mention is NOT a pattern - set has_pattern to false for " +
+            "that. Respond with ONLY JSON: {\"has_pattern\": true or false, \"summary\": \"one plain sentence " +
+            "describing the pattern and roughly how often, or an empty string if has_pattern is false\"}.\n\n" +
+            $"MODEL: {model}\n\n{context}";
+
+        var raw = await SendJsonAsync(settings, prompt, 400, RiskJsonSchema);
+        var cleaned = StripJsonFences(raw);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(cleaned);
+            var root = doc.RootElement;
+            return new RiskFlagResult
+            {
+                HasPattern = root.TryGetProperty("has_pattern", out var hp) && hp.ValueKind == JsonValueKind.True,
+                Summary = root.TryGetProperty("summary", out var s) ? s.GetString() ?? string.Empty : string.Empty
+            };
+        }
+        catch (JsonException)
+        {
+            return new RiskFlagResult();
+        }
+    }
+
+    public static async Task<FanTagSuggestion> SuggestFanTagAsync(AppSettings settings, string username, string habits, string triggers, string notes, List<string> existingUsernames)
+    {
+        var prompt =
+            "You are helping a moderator tag a fan CRM record for a content-moderation studio. Based on the habits/" +
+            "triggers/notes text below, suggest a spend tier from 1 (low spender) to 5 (whale/highest spender) - " +
+            "use 0 only if the text gives no real signal either way. Separately, check whether this username looks " +
+            "like it could be the SAME PERSON as one already in the studio's records (e.g. same name with " +
+            "different casing, punctuation, or a minor variant) - not just a vaguely similar name. Respond with " +
+            "ONLY JSON: {\"suggested_tier\": 0-5, \"likely_duplicate_of\": \"the exact existing username it likely " +
+            "matches, or an empty string if none look like the same person\"}.\n\n" +
+            $"NEW USERNAME: {username}\n" +
+            $"HABITS: {habits}\nTRIGGERS: {triggers}\nNOTES: {notes}\n\n" +
+            $"EXISTING USERNAMES:\n{string.Join("\n", existingUsernames)}";
+
+        var raw = await SendJsonAsync(settings, prompt, 300, FanTagJsonSchema);
+        var cleaned = StripJsonFences(raw);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(cleaned);
+            var root = doc.RootElement;
+            return new FanTagSuggestion
+            {
+                SuggestedTier = root.TryGetProperty("suggested_tier", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt32() : 0,
+                LikelyDuplicateOf = root.TryGetProperty("likely_duplicate_of", out var d) ? d.GetString() ?? string.Empty : string.Empty
+            };
+        }
+        catch (JsonException)
+        {
+            return new FanTagSuggestion();
+        }
     }
 
     private static AskResult ParseAskResult(string raw)
     {
-        var cleaned = raw.Trim();
-        if (cleaned.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstNewline = cleaned.IndexOf('\n');
-            if (firstNewline >= 0) cleaned = cleaned[(firstNewline + 1)..];
-            var fenceEnd = cleaned.LastIndexOf("```", StringComparison.Ordinal);
-            if (fenceEnd >= 0) cleaned = cleaned[..fenceEnd];
-            cleaned = cleaned.Trim();
-        }
+        var cleaned = StripJsonFences(raw);
 
         try
         {
@@ -170,15 +261,27 @@ internal static class AiSummaryService
         };
     }
 
-    private static Task<string> SendJsonAsync(AppSettings settings, string prompt, int maxTokens)
+    private static Task<string> SendJsonAsync(AppSettings settings, string prompt, int maxTokens, string schema)
     {
         var apiKey = RequireApiKey(settings);
         return settings.AiProvider switch
         {
-            "Anthropic Claude" => SendViaAnthropicJsonAsync(apiKey, prompt, maxTokens),
+            "Anthropic Claude" => SendViaAnthropicJsonAsync(apiKey, prompt, maxTokens, schema),
             "OpenRouter" => SendViaOpenRouterAsync(apiKey, prompt, jsonMode: true),
             _ => throw NotSupportedProvider(settings.AiProvider)
         };
+    }
+
+    private static string StripJsonFences(string raw)
+    {
+        var cleaned = raw.Trim();
+        if (!cleaned.StartsWith("```", StringComparison.Ordinal)) return cleaned;
+
+        var firstNewline = cleaned.IndexOf('\n');
+        if (firstNewline >= 0) cleaned = cleaned[(firstNewline + 1)..];
+        var fenceEnd = cleaned.LastIndexOf("```", StringComparison.Ordinal);
+        if (fenceEnd >= 0) cleaned = cleaned[..fenceEnd];
+        return cleaned.Trim();
     }
 
     private static string RequireApiKey(AppSettings settings)
@@ -201,7 +304,7 @@ internal static class AiSummaryService
             Messages = [new() { Role = Role.User, Content = prompt }]
         });
 
-    private static Task<string> SendViaAnthropicJsonAsync(string apiKey, string prompt, int maxTokens) =>
+    private static Task<string> SendViaAnthropicJsonAsync(string apiKey, string prompt, int maxTokens, string schema) =>
         InvokeAnthropicAsync(apiKey, new MessageCreateParams
         {
             Model = AnthropicModel,
@@ -210,7 +313,7 @@ internal static class AiSummaryService
             {
                 Format = new JsonOutputFormat
                 {
-                    Schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(AskJsonSchema)!
+                    Schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(schema)!
                 }
             },
             Messages = [new() { Role = Role.User, Content = prompt }]

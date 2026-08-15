@@ -41,7 +41,7 @@
     <!-- Row 1: Data Entry Form -->
     <Border Grid.Row="1" Padding="10" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
       <Border Background="#FF1E1E1E" Padding="10" CornerRadius="6" BorderBrush="#FF555555" BorderThickness="1">
-        <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
           <!-- Form Row 1: User, Model and Platform -->
           <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,Auto" ColumnSpacing="6">
             <TextBlock Grid.Column="0" Text="User:" Foreground="White" VerticalAlignment="Center"/>
@@ -78,6 +78,10 @@
               <ComboBoxItem Content="$$$$$ Whale"/>
             </ComboBox>
           </Grid>
+          <!-- Form Row 3: AI assist -->
+          <StackPanel Grid.Row="2" Orientation="Horizontal">
+            <Button Name="BtnSuggestTag" Content="✨ Suggest tier &amp; check duplicates" Height="26" Padding="8,0" Background="#FF3E3E42" Foreground="White" FontSize="11" Click="BtnSuggestTag_Click"/>
+          </StackPanel>
         </Grid>
       </Border>
     </Border>

@@ -30,6 +30,14 @@
           </StackPanel>
         </Border>
 
+        <!-- AI: proactive risk flag, only shown when a real recurring pattern is found -->
+        <Border Name="RiskFlagBorder" Background="#FF3A2418" CornerRadius="8" Padding="12" BorderBrush="#FFf9e2af" BorderThickness="1" IsVisible="False">
+          <StackPanel Spacing="4">
+            <TextBlock Text="⚠ Heads Up" Foreground="#FFf9e2af" FontSize="14" FontWeight="Bold"/>
+            <TextBlock Name="RiskFlagText" Text="" Foreground="White" FontSize="13" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
         <!-- Handoff: last shift's report -->
         <Border Background="#FF252526" CornerRadius="8" Padding="12" BorderBrush="#FF555555" BorderThickness="1">
           <StackPanel Spacing="6">

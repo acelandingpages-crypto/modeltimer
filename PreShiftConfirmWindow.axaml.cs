@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ModelTimer;
 
@@ -36,6 +37,7 @@ public partial class PreShiftConfirmWindow : Window
 
         LoadHandoffNotes();
         LoadVipFans();
+        _ = LoadRiskFlagAsync();
 
         ChkLighting.IsCheckedChanged += (s, e) => UpdateStartButtonState();
         ChkFraming.IsCheckedChanged += (s, e) => UpdateStartButtonState();
@@ -108,6 +110,50 @@ public partial class PreShiftConfirmWindow : Window
         {
             HandoffRatingText.Text = $"Model mood last shift: {RatingLabels[lastShift.PerformanceRating]}";
             HandoffRatingText.IsVisible = true;
+        }
+    }
+
+    private async Task LoadRiskFlagAsync()
+    {
+        try
+        {
+            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+            var settings = JsonStore.Load<AppSettings>(settingsPath);
+            if (!AiSummaryService.IsConfigured(settings)) return;
+
+            var shiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
+            var crmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
+            var shiftData = JsonStore.Load<ShiftDataFile>(shiftPath);
+            var crmData = JsonStore.Load<CrmDataFile>(crmPath);
+
+            var recentIssues = (shiftData?.Shifts ?? new List<ShiftEntry>())
+                .Where(s => string.Equals(s.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(s.IssuesToWatch))
+                .OrderByDescending(s => s.Timestamp)
+                .Take(10)
+                .Select(s => $"- {s.Timestamp:yyyy-MM-dd} ({s.Moderator}): {s.IssuesToWatch}")
+                .ToList();
+
+            var fanTriggers = (crmData?.Records ?? new List<CrmEntry>())
+                .Where(r => string.Equals(r.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(r.Triggers))
+                .Select(r => $"- {r.User}: {r.Triggers}")
+                .ToList();
+
+            // Not enough signal to look for a "recurring" pattern - skip the AI call entirely.
+            if (recentIssues.Count < 2 && fanTriggers.Count == 0) return;
+
+            var context = "ISSUES FROM RECENT SHIFTS:\n" + string.Join("\n", recentIssues) +
+                          "\n\nFAN TRIGGERS:\n" + string.Join("\n", fanTriggers);
+
+            var flag = await AiSummaryService.CheckRiskPatternAsync(settings!, _model, context);
+            if (flag.HasPattern && !string.IsNullOrWhiteSpace(flag.Summary))
+            {
+                RiskFlagText.Text = flag.Summary;
+                RiskFlagBorder.IsVisible = true;
+            }
+        }
+        catch
+        {
+            // Best-effort background check - a failure here should never block starting a shift.
         }
     }
 

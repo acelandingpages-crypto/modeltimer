@@ -12,7 +12,7 @@
         WindowDecorations="None"
         ShowInTaskbar="False">
 
-  <Grid RowDefinitions="30,50,Auto,Auto,Auto,*" >
+  <Grid RowDefinitions="30,50,Auto,Auto,Auto,Auto,*" >
     <!-- Title Bar -->
     <Border Grid.Row="0" Background="#FFcba6f7" PointerPressed="TitleBar_PointerPressed">
       <Grid ColumnDefinitions="*,Auto">
@@ -98,8 +98,18 @@
       </Grid>
     </Border>
 
-    <!-- Row 5: Bar Chart -->
-    <Border Grid.Row="5" Padding="10" Background="#FF1E1E1E">
+    <!-- Row 5: AI coverage suggestion -->
+    <Border Grid.Row="5" Padding="4,2,4,4" Background="#FF1E1E1E">
+      <StackPanel Spacing="6">
+        <Button Name="BtnSuggestCoverage" Content="✨ Suggest Coverage" Height="28" Padding="10,0" Background="#FF3E3E42" Foreground="White" FontSize="12" HorizontalAlignment="Left" Click="BtnSuggestCoverage_Click"/>
+        <Border Name="CoverageAnswerBorder" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="1" CornerRadius="6" Padding="10" IsVisible="False">
+          <StackPanel Name="CoverageAnswerPanel" Spacing="6"/>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- Row 6: Bar Chart -->
+    <Border Grid.Row="6" Padding="10" Background="#FF1E1E1E">
       <Grid RowDefinitions="Auto,*,Auto">
         <Grid Grid.Row="0" ColumnDefinitions="*">
           <TextBlock Grid.Column="0" Name="ChartTitle" Text="Hours per day" Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
