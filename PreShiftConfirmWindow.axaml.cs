@@ -77,9 +77,8 @@ public partial class PreShiftConfirmWindow : Window
 
     private void LoadHandoffNotes()
     {
-        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        var data = JsonStore.Load<ShiftDataFile>(path);
-        if (data?.Shifts == null) return;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null) return;
 
         var lastShift = data.Shifts
             .Where(s => s.StopTime.HasValue && string.Equals(s.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -117,23 +116,26 @@ public partial class PreShiftConfirmWindow : Window
     {
         try
         {
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            var settings = JsonStore.Load<AppSettings>(settingsPath);
+            var settings = SettingsStore.Load();
             if (!AiSummaryService.IsConfigured(settings)) return;
 
-            var shiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-            var crmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
-            var shiftData = JsonStore.Load<ShiftDataFile>(shiftPath);
-            var crmData = JsonStore.Load<CrmDataFile>(crmPath);
+            // This check runs automatically (not from an explicit button click), so it must never
+            // be the first place a user learns their data goes to a third-party AI provider - only
+            // run it once they've explicitly consented via some other AI feature, and only when
+            // they haven't opted out of sending sensitive notes/triggers (which is all this check is).
+            if (!settings.AiConsentAcknowledged || !settings.AiIncludeSensitiveNotes) return;
 
-            var recentIssues = (shiftData?.Shifts ?? new List<ShiftEntry>())
+            var shiftData = ShiftDataStore.Load();
+            var crmData = CrmDataStore.Load();
+
+            var recentIssues = (shiftData.Shifts ?? new List<ShiftEntry>())
                 .Where(s => string.Equals(s.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(s.IssuesToWatch))
                 .OrderByDescending(s => s.Timestamp)
                 .Take(10)
                 .Select(s => $"- {s.Timestamp:yyyy-MM-dd} ({s.Moderator}): {s.IssuesToWatch}")
                 .ToList();
 
-            var fanTriggers = (crmData?.Records ?? new List<CrmEntry>())
+            var fanTriggers = (crmData.Records ?? new List<CrmEntry>())
                 .Where(r => string.Equals(r.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(r.Triggers))
                 .Select(r => $"- {r.User}: {r.Triggers}")
                 .ToList();
@@ -144,7 +146,7 @@ public partial class PreShiftConfirmWindow : Window
             var context = "ISSUES FROM RECENT SHIFTS:\n" + string.Join("\n", recentIssues) +
                           "\n\nFAN TRIGGERS:\n" + string.Join("\n", fanTriggers);
 
-            var flag = await AiSummaryService.CheckRiskPatternAsync(settings!, _model, context);
+            var flag = await AiSummaryService.CheckRiskPatternAsync(settings, _model, context);
             if (flag.HasPattern && !string.IsNullOrWhiteSpace(flag.Summary))
             {
                 RiskFlagText.Text = flag.Summary;
@@ -161,9 +163,8 @@ public partial class PreShiftConfirmWindow : Window
     {
         VipFansPanel.Children.Clear();
 
-        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
-        var data = JsonStore.Load<CrmDataFile>(path);
-        var matches = data?.Records?
+        var data = CrmDataStore.Load();
+        var matches = data.Records?
             .Where(r => string.Equals(r.Model?.Trim(), _model.Trim(), StringComparison.OrdinalIgnoreCase))
             .ToList() ?? new List<CrmEntry>();
 

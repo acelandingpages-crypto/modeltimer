@@ -5,7 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
 using System;
-using System.IO;
+using System.Linq;
 
 namespace ModelTimer;
 
@@ -22,27 +22,26 @@ public partial class SettingsWindow : Window
     public string AiApiKey { get; private set; } = string.Empty;
     public bool Confirmed { get; private set; }
 
-    private string _dataFilePath = string.Empty;
     private TextBox? _activeHotkeyBox;
 
     public SettingsWindow()
     {
         InitializeComponent();
-        _dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
         LoadSettings();
 
         ShowHotkeyBox.AddHandler(KeyDownEvent, HotkeyBox_KeyDown, RoutingStrategies.Tunnel);
         PrivateHotkeyBox.AddHandler(KeyDownEvent, HotkeyBox_KeyDown, RoutingStrategies.Tunnel);
         TypingHotkeyBox.AddHandler(KeyDownEvent, HotkeyBox_KeyDown, RoutingStrategies.Tunnel);
 
+        UpdateVersionText.Text = $"Version {AppUpdateService.CurrentVersion}";
+
         ApplyTheme();
     }
 
     private void ApplyTheme()
     {
-        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
-        if (settings != null && settings.Theme == "Light")
+        var settings = SettingsStore.Load();
+        if (settings.Theme == "Light")
         {
             RequestedThemeVariant = ThemeVariant.Light;
             UpdateThemeColors(true);
@@ -89,7 +88,20 @@ public partial class SettingsWindow : Window
         AiProviderComboBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         AiApiKeyBox.Background = new SolidColorBrush(Color.Parse(bgToolbar));
         AiApiKeyBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        ChkAiIncludeSensitiveNotes.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         AiHintText.Foreground = new SolidColorBrush(Color.Parse(fgMuted));
+        BackupBorder.Background = new SolidColorBrush(Color.Parse(bgSurface));
+        BackupSectionLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        BackupHintText.Foreground = new SolidColorBrush(Color.Parse(fgMuted));
+        BtnRestoreShiftBackup.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        BtnRestoreShiftBackup.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        BtnRestoreCrmBackup.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        BtnRestoreCrmBackup.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        UpdateBorder.Background = new SolidColorBrush(Color.Parse(bgSurface));
+        UpdateSectionLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        UpdateVersionText.Foreground = new SolidColorBrush(Color.Parse(fgMuted));
+        BtnCheckForUpdates.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        BtnCheckForUpdates.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         BtnCancel.Background = new SolidColorBrush(Color.Parse("#FFFF0000"));
         BtnCancel.Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF"));
         BtnSave.Background = new SolidColorBrush(Color.Parse("#FFa6e3a1"));
@@ -108,19 +120,17 @@ public partial class SettingsWindow : Window
 
     private void LoadSettings()
     {
-        var settings = JsonStore.Load<AppSettings>(_dataFilePath);
-        if (settings != null)
-        {
-            SelectedTheme = settings.Theme ?? "Dark";
-            ShowHotkey = settings.ShowHotkey ?? "ctrl + s";
-            PrivateHotkey = settings.PrivateHotkey ?? "ctrl + p";
-            TypingHotkey = settings.TypingHotkey ?? "ctrl + k";
-            NotifyOnShiftComplete = settings.NotifyOnShiftComplete;
-            Warn5Min = settings.Warn5Min;
-            Warn15Min = settings.Warn15Min;
-            AiProvider = settings.AiProvider;
-            AiApiKey = settings.AiApiKey;
-        }
+        var settings = SettingsStore.Load();
+
+        SelectedTheme = settings.Theme ?? "Dark";
+        ShowHotkey = settings.ShowHotkey ?? "ctrl + s";
+        PrivateHotkey = settings.PrivateHotkey ?? "ctrl + p";
+        TypingHotkey = settings.TypingHotkey ?? "ctrl + k";
+        NotifyOnShiftComplete = settings.NotifyOnShiftComplete;
+        Warn5Min = settings.Warn5Min;
+        Warn15Min = settings.Warn15Min;
+        AiProvider = settings.AiProvider;
+        AiApiKey = settings.AiApiKey;
 
         ThemeComboBox.SelectedItem = SelectedTheme == "Light" ? ThemeComboBox.Items[0] : ThemeComboBox.Items[1];
         ShowHotkeyBox.Text = ShowHotkey;
@@ -132,15 +142,17 @@ public partial class SettingsWindow : Window
         AiProviderComboBox.SelectedIndex = AiProvider switch
         {
             "Anthropic Claude" => 1,
-            "OpenAI" => 2,
-            "OpenRouter" => 3,
+            "OpenRouter" => 2,
             _ => 0
         };
         AiApiKeyBox.Text = AiApiKey;
+        ChkAiIncludeSensitiveNotes.IsChecked = settings.AiIncludeSensitiveNotes;
     }
 
-    private void SaveSettings()
+    private bool SaveSettings()
     {
+        var existing = SettingsStore.Load();
+
         var settings = new AppSettings
         {
             Theme = ThemeComboBox.SelectedItem is ComboBoxItem item ? item.Content?.ToString() : "Dark",
@@ -151,10 +163,12 @@ public partial class SettingsWindow : Window
             Warn5Min = ChkWarn5Min.IsChecked ?? false,
             Warn15Min = ChkWarn15Min.IsChecked ?? false,
             AiProvider = AiProviderComboBox.SelectedItem is ComboBoxItem aiItem ? aiItem.Content?.ToString() ?? "None" : "None",
-            AiApiKey = AiApiKeyBox.Text ?? string.Empty
+            AiApiKey = AiApiKeyBox.Text ?? string.Empty,
+            AiConsentAcknowledged = existing.AiConsentAcknowledged,
+            AiIncludeSensitiveNotes = ChkAiIncludeSensitiveNotes.IsChecked ?? true
         };
 
-        JsonStore.Save(_dataFilePath, settings);
+        return SettingsStore.Save(settings);
     }
 
     private void BtnResetDefaults_Click(object sender, RoutedEventArgs e)
@@ -168,11 +182,24 @@ public partial class SettingsWindow : Window
         ChkWarn15Min.IsChecked = true;
         AiProviderComboBox.SelectedIndex = 0;
         AiApiKeyBox.Text = string.Empty;
+        ChkAiIncludeSensitiveNotes.IsChecked = true;
     }
 
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
-        SaveSettings();
+        if (!HotkeysAreUnique())
+        {
+            AppDialog.ShowInfo(this, "Duplicate Hotkey",
+                "Show, Private, and Typing hotkeys must all be different — right now two of them are bound to the same combo, so only one would ever fire. Change one before saving.");
+            return;
+        }
+
+        if (!SaveSettings())
+        {
+            AppDialog.ShowInfo(this, "Save Failed", "Couldn't save settings to disk. Please try again.");
+            return;
+        }
+
         SelectedTheme = ThemeComboBox.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? "Dark" : "Dark";
         ShowHotkey = ShowHotkeyBox.Text ?? "ctrl + s";
         PrivateHotkey = PrivateHotkeyBox.Text ?? "ctrl + p";
@@ -186,9 +213,107 @@ public partial class SettingsWindow : Window
         Close();
     }
 
+    private bool HotkeysAreUnique()
+    {
+        var combos = new[] { ShowHotkeyBox.Text, PrivateHotkeyBox.Text, TypingHotkeyBox.Text }
+            .Select(h => h?.Trim().ToLowerInvariant() ?? string.Empty)
+            .Where(h => !string.IsNullOrEmpty(h))
+            .ToList();
+
+        return combos.Distinct().Count() == combos.Count;
+    }
+
     private void BtnCancel_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private async void BtnRestoreShiftBackup_Click(object sender, RoutedEventArgs e)
+    {
+        await RestoreBackup(
+            "Restore Shift Data",
+            "This replaces the current shift history with the most recent automatic backup. The current file is itself backed up first, so this can be undone by restoring again.",
+            () => ShiftDataStore.GetLatestBackupTime(),
+            () => ShiftDataStore.RestoreLatestBackup());
+    }
+
+    private async void BtnRestoreCrmBackup_Click(object sender, RoutedEventArgs e)
+    {
+        await RestoreBackup(
+            "Restore Fan Data",
+            "This replaces the current fan (CRM) data with the most recent automatic backup. The current file is itself backed up first, so this can be undone by restoring again.",
+            () => CrmDataStore.GetLatestBackupTime(),
+            () => CrmDataStore.RestoreLatestBackup());
+    }
+
+    private async System.Threading.Tasks.Task RestoreBackup(string title, string confirmMessage, Func<DateTime?> getLatestBackupTime, Func<bool> restore)
+    {
+        var latest = getLatestBackupTime();
+        if (latest == null)
+        {
+            AppDialog.ShowInfo(this, title, "No backup is available yet — one is created automatically the next time this data is saved.");
+            return;
+        }
+
+        var message = $"{confirmMessage}\n\nMost recent backup: {latest:yyyy-MM-dd HH:mm:ss}.";
+        var confirmed = await AppDialog.ShowConfirm(this, title, message, confirmLabel: "Restore");
+        if (!confirmed) return;
+
+        if (restore())
+        {
+            AppDialog.ShowInfo(this, title, "Restored. Any open windows showing this data will refresh automatically.");
+        }
+        else
+        {
+            AppDialog.ShowInfo(this, title, "Restore failed — see error_log.txt for details.");
+        }
+    }
+
+    private async void BtnCheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (!AppUpdateService.IsConfigured)
+        {
+            AppDialog.ShowInfo(this, "Updates Not Set Up", "This build isn't wired up to an update feed yet.");
+            return;
+        }
+
+        if (!AppUpdateService.IsInstalledCopy)
+        {
+            AppDialog.ShowInfo(this, "Not an Installed Copy", "This is a development build, not one installed via the updater - nothing to check.");
+            return;
+        }
+
+        var originalContent = BtnCheckForUpdates.Content;
+        try
+        {
+            BtnCheckForUpdates.IsEnabled = false;
+            BtnCheckForUpdates.Content = "Checking...";
+
+            var update = await AppUpdateService.CheckForUpdateAsync();
+            if (update == null)
+            {
+                AppDialog.ShowInfo(this, "Up to Date", $"You're on the latest version ({AppUpdateService.CurrentVersion}).");
+                return;
+            }
+
+            var version = update.TargetFullRelease.Version;
+            var confirmed = await AppDialog.ShowConfirm(this, "Update Available",
+                $"ModelTimer {version} is available (you have {AppUpdateService.CurrentVersion}). Update and restart now?",
+                confirmLabel: "Update");
+            if (!confirmed) return;
+
+            BtnCheckForUpdates.Content = "Updating...";
+            var applied = await AppUpdateService.DownloadAndApplyAsync(update);
+            if (!applied)
+            {
+                AppDialog.ShowInfo(this, "Update Failed", "Couldn't download or apply the update. Try again later, or check error_log.txt.");
+            }
+        }
+        finally
+        {
+            BtnCheckForUpdates.IsEnabled = true;
+            BtnCheckForUpdates.Content = originalContent;
+        }
     }
 
     private void HotkeyBox_GotFocus(object sender, RoutedEventArgs e)

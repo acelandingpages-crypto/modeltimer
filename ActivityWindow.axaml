@@ -25,15 +25,17 @@
 
     <!-- Row 1: Filter Bar -->
     <Border Grid.Row="1" Name="FilterBorder" Padding="10" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="0,0,0,3">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
         <TextBlock Grid.Column="0" Name="FromLabel" Text="From:" Foreground="White" VerticalAlignment="Center"/>
         <DatePicker Grid.Column="1" Name="FromDatePicker" Background="#FF3E3E42" Foreground="White" Height="30" Width="50"/>
         <TextBlock Grid.Column="2" Name="ToLabel" Text="To:" Foreground="White" VerticalAlignment="Center"/>
         <DatePicker Grid.Column="3" Name="ToDatePicker" Background="#FF3E3E42" Foreground="White" Height="30" Width="50"/>
         <TextBlock Grid.Column="4" Name="ModLabel" Text="Moderator:" Foreground="White" VerticalAlignment="Center"/>
         <ComboBox Grid.Column="5" Name="ModeratorComboBox" Background="#FF3E3E42" Foreground="White" Height="30" Width="100"/>
-        <Button Grid.Column="6" Name="BtnClear" Content="Clear" Height="30" MinWidth="45" Background="#FFFF0000" Foreground="White" Click="BtnClear_Click"/>
-        <Button Grid.Column="7" Name="BtnRefresh" Content="Refresh" Height="30" MinWidth="45" Background="#FF3E3E42" Foreground="White" Click="BtnRefresh_Click"/>
+        <TextBlock Grid.Column="6" Name="ModelLabel" Text="Model:" Foreground="White" VerticalAlignment="Center"/>
+        <ComboBox Grid.Column="7" Name="ModelComboBox" Background="#FF3E3E42" Foreground="White" Height="30" Width="100"/>
+        <Button Grid.Column="8" Name="BtnClear" Content="Clear" Height="30" MinWidth="45" Background="#FFFF0000" Foreground="White" Click="BtnClear_Click"/>
+        <Button Grid.Column="9" Name="BtnRefresh" Content="Refresh" Height="30" MinWidth="45" Background="#FF3E3E42" Foreground="White" Click="BtnRefresh_Click"/>
       </Grid>
     </Border>
 
@@ -118,12 +120,7 @@
           <Canvas Name="ChartCanvas" Background="#FF252526"/>
         </ScrollViewer>
         <TextBlock Grid.Row="1" Name="NoChartText" Text="No data to display" Foreground="#FF888888" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False"/>
-        <StackPanel Grid.Row="2" Name="LegendPanel" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,5,0,0">
-          <StackPanel Orientation="Horizontal" Spacing="5">
-            <Border Width="12" Height="2" Background="#FFcba6f7"/>
-            <TextBlock Text="Avg (average hrs/day)" Foreground="White" VerticalAlignment="Center"/>
-          </StackPanel>
-        </StackPanel>
+        <StackPanel Grid.Row="2" Name="LegendPanel" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,5,0,0"/>
       </Grid>
     </Border>
   </Grid>

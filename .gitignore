@@ -1,6 +1,8 @@
 bin/
 obj/
 publish_single/
+publish_temp/
+releases/
 
 # Runtime data files generated next to the app
 shift_data.json
@@ -11,3 +13,6 @@ error_log.txt
 *.log
 activity_export.csv
 activity_export.tsv
+shift_history_export.csv
+shift_history_export.tsv
+backups/

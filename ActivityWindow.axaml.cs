@@ -16,7 +16,6 @@ namespace ModelTimer;
 
 public partial class ActivityWindow : Window
 {
-    private string _dataFilePath = string.Empty;
     private List<ShiftHistoryItem> _allShifts = new();
     private List<ShiftHistoryItem> _filteredShifts = new();
     private DateTime? _minDate;
@@ -30,21 +29,19 @@ public partial class ActivityWindow : Window
     private double _panOffsetStartX;
     private List<DateTime> _lastChartDates = new();
     private List<double> _lastChartValues = new();
-    private string _crmDataFilePath = string.Empty;
     private List<CrmEntry> _crmRecords = new();
     private static readonly string[] SpendTierLabels = { "-", "$", "$$", "$$$", "$$$$", "$$$$$" };
 
     public ActivityWindow()
     {
         InitializeComponent();
-        _dataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        _crmDataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
         LoadShiftHistory();
         LoadCrmRecords();
 
         FromDatePicker.SelectedDateChanged += FromDatePicker_SelectedDateChanged;
         ToDatePicker.SelectedDateChanged += ToDatePicker_SelectedDateChanged;
         ModeratorComboBox.SelectionChanged += (s, e) => RefreshDashboard();
+        ModelComboBox.SelectionChanged += (s, e) => RefreshDashboard();
         BtnApply.Click += (s, e) => RefreshDashboard();
         BtnRefresh.Click += (s, e) => { LoadShiftHistory(); LoadCrmRecords(); RefreshDashboard(); };
         BtnClear.Click += (s, e) =>
@@ -53,6 +50,7 @@ public partial class ActivityWindow : Window
             if (_minDate.HasValue) FromDatePicker.SelectedDate = _minDate.Value;
             if (_maxDate.HasValue) ToDatePicker.SelectedDate = _maxDate.Value;
             ModeratorComboBox.SelectedIndex = 0;
+            ModelComboBox.SelectedIndex = 0;
             _isInitializing = false;
             RefreshDashboard();
         };
@@ -70,6 +68,7 @@ public partial class ActivityWindow : Window
             FromDatePicker.IsEnabled = false;
             ToDatePicker.IsEnabled = false;
             ModeratorComboBox.IsEnabled = false;
+            ModelComboBox.IsEnabled = false;
             BtnApply.IsEnabled = false;
             BtnRefresh.IsEnabled = false;
             BtnClear.IsEnabled = false;
@@ -86,12 +85,31 @@ public partial class ActivityWindow : Window
             var moderators = _allShifts.Select(s => s.Moderator).Distinct().OrderBy(m => m).ToList();
             ModeratorComboBox.ItemsSource = new[] { "All" }.Concat(moderators);
             ModeratorComboBox.SelectedIndex = 0;
+
+            var models = _allShifts.Select(s => s.Model).Distinct().OrderBy(m => m).ToList();
+            ModelComboBox.ItemsSource = new[] { "All" }.Concat(models);
+            ModelComboBox.SelectedIndex = 0;
         }
 
         RefreshDashboard();
         ApplyTheme();
 
         Dispatcher.UIThread.Post(() => DrawChart(), DispatcherPriority.Loaded);
+
+        ShiftDataStore.Changed += DataStore_Changed;
+        CrmDataStore.Changed += DataStore_Changed;
+        Closed += (s, e) =>
+        {
+            ShiftDataStore.Changed -= DataStore_Changed;
+            CrmDataStore.Changed -= DataStore_Changed;
+        };
+    }
+
+    private void DataStore_Changed()
+    {
+        LoadShiftHistory();
+        LoadCrmRecords();
+        RefreshDashboard();
     }
 
     private void FromDatePicker_SelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
@@ -140,10 +158,13 @@ public partial class ActivityWindow : Window
         RefreshDashboard();
     }
 
-    private double GetDurationHours(ShiftHistoryItem item)
-    {
-        return item.ElapsedHours + item.ElapsedMinutes / 60.0 + item.ElapsedSeconds / 3600.0;
-    }
+    private double GetDurationHours(ShiftHistoryItem item) =>
+        ShiftMath.DurationHours(item.ElapsedHours, item.ElapsedMinutes, item.ElapsedSeconds);
+
+    private double GetLostTimeHours(ShiftHistoryItem item) => ShiftMath.LostTimeHours(item.LostTimeSeconds);
+
+    private double GetPlannedHours(ShiftHistoryItem item) =>
+        ShiftMath.PlannedHours(item.DurationHours, item.DurationMinutes);
 
     private void RefreshDashboard()
     {
@@ -163,13 +184,15 @@ public partial class ActivityWindow : Window
         var fromDate = FromDatePicker.SelectedDate?.DateTime;
         var toDate = ToDatePicker.SelectedDate?.DateTime;
         var moderator = ModeratorComboBox.SelectedItem as string;
+        var model = ModelComboBox.SelectedItem as string;
 
         _filteredShifts = _allShifts.Where(item =>
         {
             bool matchesFrom = !fromDate.HasValue || item.Timestamp.Date >= fromDate.Value.Date;
             bool matchesTo = !toDate.HasValue || item.Timestamp.Date <= toDate.Value.Date;
             bool matchesMod = string.IsNullOrEmpty(moderator) || moderator == "All" || item.Moderator == moderator;
-            return matchesFrom && matchesTo && matchesMod;
+            bool matchesModel = string.IsNullOrEmpty(model) || model == "All" || item.Model == model;
+            return matchesFrom && matchesTo && matchesMod && matchesModel;
         }).Where(item => item.ElapsedHours > 0 || item.ElapsedMinutes > 0 || item.ElapsedSeconds > 0)
           .OrderByDescending(s => s.Timestamp)
           .ToList();
@@ -211,9 +234,9 @@ public partial class ActivityWindow : Window
         
         var dailyTotals = _filteredShifts
             .GroupBy(s => s.Timestamp.Date)
-            .Select(g => g.Sum(s => GetDurationHours(s)))
+            .Select(g => g.Sum(s => GetDurationHours(s)) + g.Sum(s => GetLostTimeHours(s)))
             .ToList();
-        
+
         var dataMax = dailyTotals.DefaultIfEmpty(0).Max();
         if (dataMax <= 0) dataMax = 0.1;
         _yAxisMax = dataMax;
@@ -315,14 +338,17 @@ public partial class ActivityWindow : Window
         var viewportWidth = ChartScrollViewer.Viewport.Width;
         if (viewportWidth <= 0) return;
         
+        // Must match DrawChart's own group sizing exactly, or the pan clamp drifts out of sync
+        // with where the chart actually ends.
         var padding = new Thickness(40, 20, 20, 40);
-        var barWidth = 40.0;
-        var barGap = 20.0;
-        var baseCanvasWidth = padding.Left + padding.Right + _lastChartDates.Count * (barWidth + barGap);
-        
+        var baseCanvasWidth = padding.Left + padding.Right + _lastChartDates.Count * (GroupWidth + GroupGap);
+
         _chartOffsetX = Math.Min(0, Math.Max(_chartOffsetX, viewportWidth - baseCanvasWidth));
         _chartOffsetY = 0;
     }
+
+    private const double GroupWidth = 80.0;
+    private const double GroupGap = 20.0;
 
     private void DrawChart()
     {
@@ -333,15 +359,23 @@ public partial class ActivityWindow : Window
             {
                 Date = g.Key,
                 ModeratorHours = g.GroupBy(s => s.Moderator)
-                    .Select(mg => new { Moderator = mg.Key, Hours = mg.Sum(s => GetDurationHours(s)) })
+                    .Select(mg => new
+                    {
+                        Moderator = mg.Key,
+                        // Worked time is split at the planned shift length: anything beyond it is
+                        // "overrun" (the shift ran long) rather than folded silently into worked hours.
+                        Hours = mg.Sum(s => Math.Min(GetDurationHours(s), GetPlannedHours(s))),
+                        OverrunHours = mg.Sum(s => ShiftMath.OverrunHours(GetDurationHours(s), GetPlannedHours(s))),
+                        LostHours = mg.Sum(s => GetLostTimeHours(s))
+                    })
                     .OrderBy(m => m.Moderator)
                     .ToList()
             })
             .OrderBy(x => x.Date)
             .ToList();
-        
+
         _lastChartDates = dailyByModerator.Select(x => x.Date).ToList();
-        _lastChartValues = dailyByModerator.Select(x => x.ModeratorHours.Sum(m => m.Hours)).ToList();
+        _lastChartValues = dailyByModerator.Select(x => x.ModeratorHours.Sum(m => m.Hours + m.OverrunHours + m.LostHours)).ToList();
 
         if (!dailyByModerator.Any())
         {
@@ -361,8 +395,8 @@ public partial class ActivityWindow : Window
         }
 
         var padding = new Thickness(40, 20, 20, 40);
-        var groupWidth = 80.0;
-        var groupGap = 20.0;
+        var groupWidth = GroupWidth;
+        var groupGap = GroupGap;
         var baseCanvasWidth = padding.Left + padding.Right + dailyByModerator.Count * (groupWidth + groupGap);
         
         ChartCanvas.Width = Math.Max(baseCanvasWidth, viewportWidth);
@@ -375,38 +409,24 @@ public partial class ActivityWindow : Window
         var chartWidth = baseCanvasWidth - padding.Left - padding.Right;
         var chartHeight = viewportHeight - padding.Top - padding.Bottom;
         
-        var dailyTotals = dailyByModerator.Select(g => g.ModeratorHours.Sum(m => m.Hours)).ToList();
+        var dailyTotals = dailyByModerator.Select(g => g.ModeratorHours.Sum(m => m.Hours + m.OverrunHours + m.LostHours)).ToList();
         var dataMax = dailyTotals.DefaultIfEmpty(0).Max();
         if (dataMax <= 0) dataMax = 0.1;
         if (_yAxisMax < dataMax) _yAxisMax = dataMax * 1.1;
-        
-        if (_yAxisMax < dataMax)
-        {
-            _yAxisMax = dataMax * 1.1;
-        }
-        
+
         var avgValue = dailyTotals.Average();
-        
+
         var gridColor = Color.FromRgb(0x44, 0x44, 0x44);
         var textColor = Color.FromRgb(0xFF, 0xFF, 0xFF);
         var secondaryColor = Color.FromRgb(0x33, 0x33, 0x33);
-        
-        var moderatorColors = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "ujin", Color.FromRgb(0xa6, 0xe3, 0xa1) },
-            { "mato", Color.FromRgb(0xcb, 0xa6, 0xf7) },
-            { "luna", Color.FromRgb(0x89, 0xb4, 0xfa) },
-            { "katy", Color.FromRgb(0xf9, 0xe2, 0xaf) }
-        };
-        
+        var lostTimeColor = Color.FromRgb(0xf3, 0x8b, 0xa8);
+        var overrunColor = Color.FromRgb(0xf9, 0xa8, 0x4b);
+
+        var moderatorColorMap = ModeratorColorAssigner.Assign(_allShifts.Select(s => s.Moderator));
+
         Color GetModeratorColor(string mod)
         {
-            if (moderatorColors.TryGetValue(mod, out var c)) return c;
-            var hash = mod.GetHashCode();
-            var r = (byte)((hash & 0xFF0000) >> 16);
-            var g = (byte)((hash & 0x00FF00) >> 8);
-            var b = (byte)(hash & 0x0000FF);
-            return Color.FromRgb(r, g, b);
+            return moderatorColorMap.TryGetValue(mod, out var c) ? c : Color.FromRgb(0xcc, 0xcc, 0xcc);
         }
 
         var mainLineCount = 13;
@@ -483,10 +503,43 @@ public partial class ActivityWindow : Window
             for (int m = 0; m < mods.Count; m++)
             {
                 var modHours = mods[m].Hours;
+                var overrunHours = mods[m].OverrunHours;
+                var lostHours = mods[m].LostHours;
                 var barHeight = (modHours / _yAxisMax) * chartHeight;
-                var y = chartTop + chartHeight - barHeight;
+                var overrunHeight = (overrunHours / _yAxisMax) * chartHeight;
+                var lostHeight = (lostHours / _yAxisMax) * chartHeight;
                 var x = groupX + m * (barWidth + 4);
-                
+                var topY = chartTop + chartHeight - barHeight - overrunHeight - lostHeight;
+
+                // Stacked bottom-to-top: planned worked time (moderator color), then any
+                // overrun beyond the planned shift length (amber), then paused/lost time
+                // (red) - all in the SAME bar for that moderator/day, never a separate one.
+                if (lostHeight > 0)
+                {
+                    var lostBar = new Border
+                    {
+                        Width = barWidth,
+                        Height = Math.Max(1, lostHeight),
+                        Background = new SolidColorBrush(lostTimeColor)
+                    };
+                    Canvas.SetLeft(lostBar, x);
+                    Canvas.SetTop(lostBar, topY);
+                    ChartCanvas.Children.Add(lostBar);
+                }
+
+                if (overrunHeight > 0)
+                {
+                    var overrunBar = new Border
+                    {
+                        Width = barWidth,
+                        Height = Math.Max(1, overrunHeight),
+                        Background = new SolidColorBrush(overrunColor)
+                    };
+                    Canvas.SetLeft(overrunBar, x);
+                    Canvas.SetTop(overrunBar, topY + lostHeight);
+                    ChartCanvas.Children.Add(overrunBar);
+                }
+
                 var bar = new Border
                 {
                     Width = barWidth,
@@ -494,7 +547,7 @@ public partial class ActivityWindow : Window
                     Background = new SolidColorBrush(GetModeratorColor(mods[m].Moderator))
                 };
                 Canvas.SetLeft(bar, x);
-                Canvas.SetTop(bar, y);
+                Canvas.SetTop(bar, topY + lostHeight + overrunHeight);
                 ChartCanvas.Children.Add(bar);
             }
             
@@ -532,25 +585,46 @@ public partial class ActivityWindow : Window
         ChartCanvas.Children.Add(avgLabel);
 
         LegendPanel.Children.Clear();
-        var modLegendItem = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 5 };
-        var modColors = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "ujin", Color.FromRgb(0xa6, 0xe3, 0xa1) },
-            { "mato", Color.FromRgb(0xcb, 0xa6, 0xf7) },
-            { "luna", Color.FromRgb(0x89, 0xb4, 0xfa) },
-            { "katy", Color.FromRgb(0xf9, 0xe2, 0xaf) }
-        };
+
+        // The chart clears LegendPanel every draw, so the static "Avg" swatch defined in XAML
+        // never actually survives to be seen - rebuild it here alongside everything else.
+        var avgItem = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 5 };
+        avgItem.Children.Add(new Border { Width = 12, Height = 2, Background = new SolidColorBrush(Color.FromRgb(0xcb, 0xa6, 0xf7)) });
+        avgItem.Children.Add(new TextBlock { Text = "Avg (average hrs/day)", Foreground = new SolidColorBrush(textColor), FontSize = 10, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+        LegendPanel.Children.Add(avgItem);
+
+        var addedModerators = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var anyLostTime = false;
+        var anyOverrun = false;
         foreach (var group in dailyByModerator)
         {
             foreach (var mod in group.ModeratorHours)
             {
-                if (LegendPanel.Children.OfType<StackPanel>().Any(s => s.Tag as string == mod.Moderator)) continue;
+                if (mod.LostHours > 0) anyLostTime = true;
+                if (mod.OverrunHours > 0) anyOverrun = true;
+                if (!addedModerators.Add(mod.Moderator)) continue;
+
                 var item = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 5, Tag = mod.Moderator };
-                var color = modColors.ContainsKey(mod.Moderator.ToLower()) ? modColors[mod.Moderator.ToLower()] : Color.FromRgb(0xff, 0x92, 0xd2);
-                item.Children.Add(new Border { Width = 12, Height = 12, Background = new SolidColorBrush(color) });
+                item.Children.Add(new Border { Width = 12, Height = 12, Background = new SolidColorBrush(GetModeratorColor(mod.Moderator)) });
                 item.Children.Add(new TextBlock { Text = mod.Moderator, Foreground = new SolidColorBrush(textColor), FontSize = 10, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
                 LegendPanel.Children.Add(item);
             }
+        }
+
+        if (anyOverrun)
+        {
+            var overrunItem = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 5 };
+            overrunItem.Children.Add(new Border { Width = 12, Height = 12, Background = new SolidColorBrush(overrunColor) });
+            overrunItem.Children.Add(new TextBlock { Text = "Overrun", Foreground = new SolidColorBrush(textColor), FontSize = 10, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+            LegendPanel.Children.Add(overrunItem);
+        }
+
+        if (anyLostTime)
+        {
+            var lostItem = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 5 };
+            lostItem.Children.Add(new Border { Width = 12, Height = 12, Background = new SolidColorBrush(lostTimeColor) });
+            lostItem.Children.Add(new TextBlock { Text = "Lost Time", Foreground = new SolidColorBrush(textColor), FontSize = 10, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+            LegendPanel.Children.Add(lostItem);
         }
     }
 
@@ -612,8 +686,7 @@ public partial class ActivityWindow : Window
 
     private async void BtnSuggestCoverage_Click(object sender, RoutedEventArgs e)
     {
-        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        var settings = SettingsStore.Load();
         if (!AiSummaryService.IsConfigured(settings))
         {
             ShowInfoDialog("AI Not Set Up", "Add a provider and API key under Settings to get coverage suggestions.");
@@ -625,6 +698,8 @@ public partial class ActivityWindow : Window
             ShowInfoDialog("Suggest Coverage", "No shift history yet to base a suggestion on.");
             return;
         }
+
+        if (!await AiConsentService.EnsureConsentAsync(this, settings)) return;
 
         var originalContent = BtnSuggestCoverage.Content;
         try
@@ -646,7 +721,7 @@ public partial class ActivityWindow : Window
                 "by moderator), which day(s) of the week are under-covered relative to the others, and which " +
                 "moderator would make sense to schedule there based on their existing pattern? Be specific and practical.";
 
-            var result = await AiSummaryService.AskAsync(settings!, question, context);
+            var result = await AiSummaryService.AskAsync(settings, question, context);
             AskResultRenderer.Render(CoverageAnswerPanel, result);
         }
         catch (Exception ex)
@@ -684,42 +759,7 @@ public partial class ActivityWindow : Window
         return sb.ToString();
     }
 
-    private void ShowInfoDialog(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            Height = 190,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var okBtn = new Button
-        {
-            Content = "OK",
-            Width = 100,
-            Height = 30,
-            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
-            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
-        };
-        okBtn.Click += (s, e) => dialog.Close();
-
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-        dialog.ShowDialog(this);
-    }
+    private void ShowInfoDialog(string title, string message) => AppDialog.ShowInfo(this, title, message);
 
     private void LoadShiftHistory()
     {
@@ -728,8 +768,8 @@ public partial class ActivityWindow : Window
         _minDate = null;
         _maxDate = null;
 
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
-        if (data?.Shifts == null) return;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null) return;
 
         foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
         {
@@ -749,7 +789,8 @@ public partial class ActivityWindow : Window
                 DurationMinutes = entry.DurationMinutes,
                 ElapsedHours = entry.ElapsedHours,
                 ElapsedMinutes = entry.ElapsedMinutes,
-                ElapsedSeconds = entry.ElapsedSeconds
+                ElapsedSeconds = entry.ElapsedSeconds,
+                LostTimeSeconds = entry.LostTimeSeconds
             };
 
             _allShifts.Add(item);
@@ -759,8 +800,8 @@ public partial class ActivityWindow : Window
     private void LoadCrmRecords()
     {
         _crmRecords.Clear();
-        var data = JsonStore.Load<CrmDataFile>(_crmDataFilePath);
-        if (data?.Records == null) return;
+        var data = CrmDataStore.Load();
+        if (data.Records == null) return;
         _crmRecords.AddRange(data.Records);
     }
 
@@ -845,9 +886,8 @@ public partial class ActivityWindow : Window
 
     private void ApplyTheme()
     {
-        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
-        if (settings != null && settings.Theme == "Light")
+        var settings = SettingsStore.Load();
+        if (settings.Theme == "Light")
         {
             RequestedThemeVariant = ThemeVariant.Light;
             UpdateThemeColors(true);
@@ -876,6 +916,9 @@ public partial class ActivityWindow : Window
         ModLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         ModeratorComboBox.Background = new SolidColorBrush(Color.Parse(bgToolbar));
         ModeratorComboBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        ModelLabel.Foreground = new SolidColorBrush(Color.Parse(fgMain));
+        ModelComboBox.Background = new SolidColorBrush(Color.Parse(bgToolbar));
+        ModelComboBox.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         DashboardTitle.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         TotalText.Foreground = new SolidColorBrush(Color.Parse(fgMain));
         DailyAvgText.Foreground = new SolidColorBrush(Color.Parse(fgMain));
@@ -896,32 +939,6 @@ public partial class ActivityWindow : Window
         return 10 * magnitude;
     }
 
-    private string FormatDuration(double totalHours)
-    {
-        var totalSeconds = (int)Math.Round(totalHours * 3600);
-        if (totalSeconds <= 0) return "0 sec";
-        
-        var hours = totalSeconds / 3600;
-        var minutes = (totalSeconds % 3600) / 60;
-        var seconds = totalSeconds % 60;
-        
-        if (hours > 0)
-        {
-            if (minutes > 0 && seconds > 0)
-                return $"{hours} hour {minutes} min {seconds} sec";
-            if (minutes > 0)
-                return $"{hours} hour {minutes} min";
-            return $"{hours} hour";
-        }
-        
-        if (minutes > 0)
-        {
-            if (seconds > 0)
-                return $"{minutes} min {seconds} sec";
-            return $"{minutes} min";
-        }
-        
-        return $"{seconds} sec";
-    }
+    private string FormatDuration(double totalHours) => ShiftMath.FormatDuration(totalHours);
 
 }

@@ -4,9 +4,9 @@
         x:Class="ModelTimer.SettingsWindow"
         Title="Settings"
         Width="400"
-        Height="680"
+        Height="800"
         MinWidth="400"
-        MinHeight="680"
+        MinHeight="800"
         Background="#FF1E1E1E"
         WindowStartupLocation="CenterOwner"
         WindowDecorations="None"
@@ -25,7 +25,8 @@
 
     <!-- Main content -->
     <Border Grid.Row="1" Name="ContentBorder" Padding="20,20,20,30" CornerRadius="0" Background="#FF252526" BorderBrush="#FFcba6f7" BorderThickness="3">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
+     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
         <!-- Row 0: Theme -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
           <TextBlock Grid.Column="0" Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="120"/>
@@ -62,16 +63,15 @@
           </StackPanel>
         </Border>
 
-        <!-- Row 5: AI summary drafting (optional, not yet wired to a provider) -->
+        <!-- Row 5: AI features -->
         <Border Grid.Row="5" Name="AiBorder" Padding="15" CornerRadius="6" Margin="0,10,0,0">
           <StackPanel Spacing="10">
-            <TextBlock Name="AiSectionLabel" Text="AI Summary Drafting (optional)" Foreground="White" FontSize="13" FontWeight="Bold"/>
+            <TextBlock Name="AiSectionLabel" Text="AI Features (optional)" Foreground="White" FontSize="13" FontWeight="Bold"/>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
               <TextBlock Grid.Column="0" Name="AiProviderLabel" Text="Provider" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="90"/>
               <ComboBox Grid.Column="1" Name="AiProviderComboBox" VerticalAlignment="Center" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" Height="30" SelectedIndex="0">
                 <ComboBoxItem Content="None"/>
                 <ComboBoxItem Content="Anthropic Claude"/>
-                <ComboBoxItem Content="OpenAI"/>
                 <ComboBoxItem Content="OpenRouter"/>
               </ComboBox>
             </Grid>
@@ -79,19 +79,44 @@
               <TextBlock Grid.Column="0" Name="AiApiKeyLabel" Text="API key" Foreground="White" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="90"/>
               <TextBox Grid.Column="1" Name="AiApiKeyBox" PasswordChar="*" Background="#FF3E3E42" Foreground="White" BorderBrush="#FF555555" BorderThickness="1" Padding="5" Height="30"/>
             </Grid>
-            <TextBlock Name="AiHintText" Text="Not wired up to a provider yet — this just stores the key for when AI drafting is enabled." Foreground="#FF888888" FontSize="11" TextWrapping="Wrap"/>
+            <CheckBox Name="ChkAiIncludeSensitiveNotes" Content="Include sensitive notes in AI requests" Foreground="White" FontSize="13" IsChecked="True"/>
+            <TextBlock Name="AiHintText" Text="Shift notes and/or fan (CRM) data are sent to the provider above when you use an AI feature. The key is encrypted on disk. Turn off sensitive notes above to keep habits/triggers/notes text out of what gets sent." Foreground="#FF888888" FontSize="11" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
 
-        <!-- Row 6: Reset to defaults -->
-        <Button Grid.Row="6" Name="BtnResetDefaults" Content="Reset to defaults" Height="32" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnResetDefaults_Click" Margin="0,15,0,0"/>
+        <!-- Row 6: Data & backups -->
+        <Border Grid.Row="6" Name="BackupBorder" Padding="15" CornerRadius="6" Margin="0,10,0,0">
+          <StackPanel Spacing="10">
+            <TextBlock Name="BackupSectionLabel" Text="Data &amp; Backups" Foreground="White" FontSize="13" FontWeight="Bold"/>
+            <TextBlock Name="BackupHintText" Text="Every save keeps the last 5 versions automatically. Use this only if shift or fan data looks wrong or missing." Foreground="#FF888888" FontSize="11" TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+              <Button Grid.Column="0" Name="BtnRestoreShiftBackup" Content="Restore Shift Data" Height="30" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnRestoreShiftBackup_Click"/>
+              <Button Grid.Column="1" Name="BtnRestoreCrmBackup" Content="Restore Fan Data" Height="30" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnRestoreCrmBackup_Click"/>
+            </Grid>
+          </StackPanel>
+        </Border>
 
-        <!-- Row 7: Cancel and Save -->
-        <Grid Grid.Row="7" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,15,0,0">
+        <!-- Row 7: Updates -->
+        <Border Grid.Row="7" Name="UpdateBorder" Padding="15" CornerRadius="6" Margin="0,10,0,0">
+          <StackPanel Spacing="10">
+            <TextBlock Name="UpdateSectionLabel" Text="Updates" Foreground="White" FontSize="13" FontWeight="Bold"/>
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+              <TextBlock Grid.Column="0" Name="UpdateVersionText" Text="Version dev" Foreground="#FF888888" FontSize="12" VerticalAlignment="Center"/>
+              <Button Grid.Column="1" Name="BtnCheckForUpdates" Content="Check for Updates" Height="30" Background="#FF3E3E42" Foreground="White" Click="BtnCheckForUpdates_Click"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Row 8: Reset to defaults -->
+        <Button Grid.Row="8" Name="BtnResetDefaults" Content="Reset to defaults" Height="32" Background="#FF3E3E42" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnResetDefaults_Click" Margin="0,15,0,0"/>
+
+        <!-- Row 9: Cancel and Save -->
+        <Grid Grid.Row="9" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,15,0,0">
           <Button Grid.Column="0" Name="BtnCancel" Content="Cancel" Height="32" Background="#FFFF0000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnCancel_Click"/>
           <Button Grid.Column="1" Name="BtnSave" Content="Save" Height="32" Background="#FFa6e3a1" Foreground="Black" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="BtnSave_Click"/>
         </Grid>
       </Grid>
+     </ScrollViewer>
     </Border>
   </Grid>
 </Window>

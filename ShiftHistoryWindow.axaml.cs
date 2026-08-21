@@ -15,17 +15,17 @@ namespace ModelTimer;
 
 public partial class ShiftHistoryWindow : Window
 {
-    private string _dataFilePath = string.Empty;
     private List<ShiftHistoryItem> _allShifts = new();
     private List<ShiftHistoryItem> _filteredShifts = new();
     private DateTime? _minDate;
     private DateTime? _maxDate;
     private bool _isInitializing;
+    private ShiftEntry? _lastDeletedEntry;
+    private DispatcherTimer? _undoTimer;
 
     public ShiftHistoryWindow()
     {
         InitializeComponent();
-        _dataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
         LoadShiftHistory();
 
         SearchBox.TextChanged += (s, e) => RefreshTable();
@@ -49,6 +49,15 @@ public partial class ShiftHistoryWindow : Window
 
         RefreshTable();
         ApplyTheme();
+
+        ShiftDataStore.Changed += ShiftDataStore_Changed;
+        Closed += (s, e) => ShiftDataStore.Changed -= ShiftDataStore_Changed;
+    }
+
+    private void ShiftDataStore_Changed()
+    {
+        LoadShiftHistory();
+        RefreshTable();
     }
 
     private void FromDatePicker_SelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
@@ -138,8 +147,8 @@ public partial class ShiftHistoryWindow : Window
         _minDate = null;
         _maxDate = null;
 
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
-        if (data?.Shifts == null) return;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null) return;
 
         int no = 1;
         foreach (var entry in data.Shifts.OrderBy(s => s.Timestamp))
@@ -161,6 +170,7 @@ public partial class ShiftHistoryWindow : Window
                 ElapsedHours = entry.ElapsedHours,
                 ElapsedMinutes = entry.ElapsedMinutes,
                 ElapsedSeconds = entry.ElapsedSeconds,
+                LostTimeSeconds = entry.LostTimeSeconds,
                 SessionSummary = entry.SessionSummary ?? string.Empty,
                 GoodMembers = entry.GoodMembers ?? string.Empty,
                 IssuesToWatch = entry.IssuesToWatch ?? string.Empty,
@@ -173,16 +183,12 @@ public partial class ShiftHistoryWindow : Window
 
     private void RefreshTable()
     {
-        TableGrid.Children.Clear();
-        TableGrid.RowDefinitions.Clear();
-
         if (!_allShifts.Any())
         {
+            ShiftGrid.ItemsSource = null;
             NoDataText.IsVisible = true;
             return;
         }
-
-        NoDataText.IsVisible = false;
 
         var searchText = SearchBox.Text?.Trim().ToLower() ?? string.Empty;
         DateTime? fromDate = FromDatePicker.SelectedDate?.DateTime;
@@ -199,154 +205,19 @@ public partial class ShiftHistoryWindow : Window
             return matchesSearch && matchesFrom && matchesTo;
         }).OrderByDescending(s => s.Timestamp).ToList();
 
-        AddHeaderRow();
-
-        int rowIndex = 1;
-        foreach (var item in _filteredShifts)
-        {
-            AddDataRow(item, rowIndex++);
-        }
-
-        if (rowIndex == 1)
-        {
-            NoDataText.IsVisible = true;
-        }
+        ShiftGrid.ItemsSource = _filteredShifts;
+        NoDataText.IsVisible = _filteredShifts.Count == 0;
     }
 
-    private void AddHeaderRow()
+    private void NotesCell_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var headers = new[] { "No", "Model", "Moderator", "Date", "Start Time", "Stop Time", "Duration", "Notes", "Edit", "Delete" };
-        for (int col = 0; col < headers.Length; col++)
+        if (sender is Control { DataContext: ShiftHistoryItem item } && !string.IsNullOrEmpty(item.Notes))
         {
-            var border = new Border
-            {
-                Background = new SolidColorBrush(Color.Parse("#FF3E3E42")),
-                BorderBrush = new SolidColorBrush(Color.Parse("#FF555555")),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(5)
-            };
-            var text = new TextBlock
-            {
-                Text = headers[col],
-                Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-                FontWeight = FontWeight.Bold,
-                FontSize = 12
-            };
-            border.Child = text;
-            Grid.SetRow(border, 0);
-            Grid.SetColumn(border, col);
-            TableGrid.Children.Add(border);
+            ShowNotesPopup(item.Notes);
         }
     }
 
-    private void AddDataRow(ShiftHistoryItem item, int rowIndex)
-    {
-        TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var bgBrush = rowIndex % 2 == 0
-            ? new SolidColorBrush(Color.Parse("#FF2D2D30"))
-            : new SolidColorBrush(Color.Parse("#FF252526"));
-
-        var cells = new[]
-        {
-            item.No.ToString(),
-            item.Model,
-            item.Moderator,
-            item.Date,
-            item.StartTimeDisplay,
-            item.StopTimeDisplay,
-            item.DurationDisplay,
-            item.Notes,
-            "Edit",
-            "Delete"
-        };
-
-        for (int col = 0; col < cells.Length; col++)
-        {
-            var border = new Border
-            {
-                Background = bgBrush,
-                BorderBrush = new SolidColorBrush(Color.Parse("#FF555555")),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(5)
-            };
-
-            if (col == 8)
-            {
-                var btn = new Button
-                {
-                    Content = "Edit",
-                    Tag = item.Id,
-                    Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
-                    Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-                    Padding = new Thickness(5, 2),
-                    Height = 25
-                };
-                btn.Click += EditButton_Click;
-                border.Child = btn;
-            }
-            else if (col == 9)
-            {
-                var btn = new Button
-                {
-                    Content = "Delete",
-                    Tag = item.Id,
-                    Background = new SolidColorBrush(Color.Parse("#FFcba6f7")),
-                    Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-                    Padding = new Thickness(5, 2),
-                    Height = 25
-                };
-                btn.Click += DeleteButton_Click;
-                border.Child = btn;
-            }
-            else if (col == 7)
-            {
-                var notesBg = rowIndex % 2 == 0
-                    ? new SolidColorBrush(Color.Parse("#FF1a2e1a"))
-                    : new SolidColorBrush(Color.Parse("#FF152815"));
-                
-                border.Background = notesBg;
-                
-                var text = new TextBlock
-                {
-                    Text = cells[col] ?? string.Empty,
-                    Foreground = new SolidColorBrush(Color.Parse("#FFa6e3a1")),
-                    FontSize = 12,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                
-                border.PointerEntered += (s, e) => border.Cursor = new Cursor(StandardCursorType.Hand);
-                border.PointerExited += (s, e) => border.Cursor = Cursor.Default;
-                border.PointerPressed += (s, e) =>
-                {
-                    if (!string.IsNullOrEmpty(item.Notes))
-                    {
-                        ShowNotesPopup(item.Notes);
-                    }
-                };
-                
-                border.Child = text;
-            }
-            else
-            {
-                var text = new TextBlock
-                {
-                    Text = cells[col] ?? string.Empty,
-                    Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-                    FontSize = 12,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                border.Child = text;
-            }
-
-            Grid.SetRow(border, rowIndex);
-            Grid.SetColumn(border, col);
-            TableGrid.Children.Add(border);
-        }
-    }
-    
     private void ShowNotesPopup(string notes)
     {
         var popup = new Window
@@ -383,15 +254,16 @@ public partial class ShiftHistoryWindow : Window
         popup.Show(this);
     }
 
-    private void DeleteButton_Click(object? sender, RoutedEventArgs e)
+    private async void DeleteButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || button.Tag is not int id) return;
+        if (sender is not Button { Tag: ShiftHistoryItem item }) return;
 
-        var item = _filteredShifts.FirstOrDefault(s => s.Id == id);
-        if (item == null) return;
+        var confirmed = await AppDialog.ShowConfirm(this, "Delete Shift Record",
+            $"Delete the {item.Date} shift for {item.Model} / {item.Moderator}? You can undo this right after.");
+        if (!confirmed) return;
 
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
-        if (data?.Shifts == null) return;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null) return;
 
         var toRemove = data.Shifts.FirstOrDefault(s =>
             s.Model == item.Model &&
@@ -401,7 +273,7 @@ public partial class ShiftHistoryWindow : Window
         if (toRemove != null)
         {
             data.Shifts.Remove(toRemove);
-            if (!JsonStore.Save(_dataFilePath, data)) return;
+            if (!ShiftDataStore.Save(data)) return;
             LoadShiftHistory();
 
             if (!_allShifts.Any())
@@ -418,15 +290,47 @@ public partial class ShiftHistoryWindow : Window
             }
 
             RefreshTable();
+            ShowUndoBanner(toRemove, $"Deleted the {item.Date} shift for {item.Model} / {item.Moderator}.");
         }
+    }
+
+    private void ShowUndoBanner(ShiftEntry removed, string message)
+    {
+        _lastDeletedEntry = removed;
+        UndoBannerText.Text = message;
+        UndoBanner.IsVisible = true;
+
+        _undoTimer?.Stop();
+        _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        _undoTimer.Tick += (s, e) =>
+        {
+            _undoTimer?.Stop();
+            UndoBanner.IsVisible = false;
+            _lastDeletedEntry = null;
+        };
+        _undoTimer.Start();
+    }
+
+    private void BtnUndoDelete_Click(object? sender, RoutedEventArgs e)
+    {
+        _undoTimer?.Stop();
+        UndoBanner.IsVisible = false;
+
+        if (_lastDeletedEntry == null) return;
+
+        var data = ShiftDataStore.Load();
+        data.Shifts ??= new List<ShiftEntry>();
+        data.Shifts.Add(_lastDeletedEntry);
+        ShiftDataStore.Save(data);
+
+        _lastDeletedEntry = null;
+        LoadShiftHistory();
+        RefreshTable();
     }
 
     private async void EditButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || button.Tag is not int id) return;
-
-        var item = _filteredShifts.FirstOrDefault(s => s.Id == id);
-        if (item == null) return;
+        if (sender is not Button { Tag: ShiftHistoryItem item }) return;
 
         var elapsed = new TimeSpan(0, item.ElapsedHours, item.ElapsedMinutes, item.ElapsedSeconds);
         var editWindow = new EditShiftReportWindow(
@@ -448,11 +352,60 @@ public partial class ShiftHistoryWindow : Window
         }
     }
 
+    private void BtnExportCsv_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!_filteredShifts.Any()) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("No,Model,Moderator,Date,Start Time,Stop Time,Duration,Rating,Notes");
+        int no = 1;
+        foreach (var item in _filteredShifts.OrderByDescending(s => s.Timestamp))
+        {
+            sb.AppendLine($"{no++},{item.Model},{item.Moderator},{item.Date},{item.StartTimeDisplay},{item.StopTimeDisplay},{item.DurationDisplay},{item.PerformanceRating},{item.Notes}");
+        }
+
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_history_export.csv");
+        try
+        {
+            File.WriteAllText(path, sb.ToString());
+            AppDialog.ShowInfo(this, "Exported", $"Saved to {path}");
+        }
+        catch (Exception ex)
+        {
+            JsonStore.LogError($"Failed to write {path}", ex);
+            AppDialog.ShowInfo(this, "Export Failed", "Couldn't write the export file — see error_log.txt for details.");
+        }
+    }
+
+    private void BtnExportExcel_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!_filteredShifts.Any()) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("No\tModel\tModerator\tDate\tStart Time\tStop Time\tDuration\tRating\tNotes");
+        int no = 1;
+        foreach (var item in _filteredShifts.OrderByDescending(s => s.Timestamp))
+        {
+            sb.AppendLine($"{no++}\t{item.Model}\t{item.Moderator}\t{item.Date}\t{item.StartTimeDisplay}\t{item.StopTimeDisplay}\t{item.DurationDisplay}\t{item.PerformanceRating}\t{item.Notes}");
+        }
+
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_history_export.tsv");
+        try
+        {
+            File.WriteAllText(path, sb.ToString());
+            AppDialog.ShowInfo(this, "Exported", $"Saved to {path}");
+        }
+        catch (Exception ex)
+        {
+            JsonStore.LogError($"Failed to write {path}", ex);
+            AppDialog.ShowInfo(this, "Export Failed", "Couldn't write the export file — see error_log.txt for details.");
+        }
+    }
+
     private void ApplyTheme()
     {
-        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
-        if (settings != null && settings.Theme == "Light")
+        var settings = SettingsStore.Load();
+        if (settings.Theme == "Light")
         {
             RequestedThemeVariant = ThemeVariant.Light;
             UpdateThemeColors(true);

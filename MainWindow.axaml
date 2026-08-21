@@ -36,7 +36,7 @@
         <StackPanel HorizontalAlignment="Center" Spacing="2">
           <TextBlock Name="TimeWorkedLabel" Text="TIME WORKED" Foreground="#FF888888" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"/>
           <TextBlock Name="ElapsedText" Text="00:00:00" Foreground="#FF00FF00" FontSize="64" FontFamily="Consolas" FontWeight="Bold" HorizontalAlignment="Center"/>
-          <TextBlock Name="MilestoneText" Text="" Foreground="#FFf9e2af" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center"/>
+          <TextBlock Name="MilestoneText" Text="" Foreground="#FFf9e2af" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"/>
         </StackPanel>
       </Border>
 

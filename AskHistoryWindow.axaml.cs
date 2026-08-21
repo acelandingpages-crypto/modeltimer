@@ -15,9 +15,6 @@ namespace ModelTimer;
 
 public partial class AskHistoryWindow : Window
 {
-    private readonly string _shiftDataPath;
-    private readonly string _crmDataPath;
-    private readonly string _settingsPath;
     private List<ShiftEntry> _lastShiftMatches = new();
     private List<CrmEntry> _lastCrmMatches = new();
     private string _lastQuery = string.Empty;
@@ -25,10 +22,6 @@ public partial class AskHistoryWindow : Window
     public AskHistoryWindow()
     {
         InitializeComponent();
-
-        _shiftDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        _crmDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
-        _settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
         try
         {
@@ -79,16 +72,16 @@ public partial class AskHistoryWindow : Window
             return;
         }
 
-        var shiftData = JsonStore.Load<ShiftDataFile>(_shiftDataPath);
-        var crmData = JsonStore.Load<CrmDataFile>(_crmDataPath);
+        var shiftData = ShiftDataStore.Load();
+        var crmData = CrmDataStore.Load();
 
-        _lastShiftMatches = (shiftData?.Shifts ?? new List<ShiftEntry>())
+        _lastShiftMatches = (shiftData.Shifts ?? new List<ShiftEntry>())
             .Where(s => MatchesShift(s, query))
             .OrderByDescending(s => s.Timestamp)
             .Take(20)
             .ToList();
 
-        _lastCrmMatches = (crmData?.Records ?? new List<CrmEntry>())
+        _lastCrmMatches = (crmData.Records ?? new List<CrmEntry>())
             .Where(r => MatchesCrm(r, query))
             .OrderByDescending(r => r.CreatedAt)
             .Take(20)
@@ -214,7 +207,10 @@ public partial class AskHistoryWindow : Window
         };
     }
 
-    private const int MaxRecordsPerType = 500;
+    // Kept modest by default - every raw row here is tokens billed on every question, and every
+    // Notes/Triggers field is fan PII leaving the machine. See AiIncludeSensitiveNotes for the
+    // per-field control.
+    private const int MaxRecordsPerType = 200;
 
     private async void BtnAskAi_Click(object sender, RoutedEventArgs e)
     {
@@ -225,12 +221,14 @@ public partial class AskHistoryWindow : Window
             return;
         }
 
-        var settings = JsonStore.Load<AppSettings>(_settingsPath);
+        var settings = SettingsStore.Load();
         if (!AiSummaryService.IsConfigured(settings))
         {
             ShowInfoDialog("AI Answering Not Set Up", "Add a provider and API key under Settings to ask questions over the full shift/CRM history. The keyword search above works without AI.");
             return;
         }
+
+        if (!await AiConsentService.EnsureConsentAsync(this, settings)) return;
 
         var originalContent = BtnAskAi.Content;
         try
@@ -247,8 +245,8 @@ public partial class AskHistoryWindow : Window
             });
             AiAnswerBorder.IsVisible = true;
 
-            var database = BuildFullDatabaseContext();
-            var result = await AiSummaryService.AskAsync(settings!, question, database);
+            var database = BuildFullDatabaseContext(settings.AiIncludeSensitiveNotes);
+            var result = await AiSummaryService.AskAsync(settings, question, database);
             AskResultRenderer.Render(AiAnswerPanel, result);
         }
         catch (Exception ex)
@@ -263,72 +261,51 @@ public partial class AskHistoryWindow : Window
         }
     }
 
-    private string BuildFullDatabaseContext()
+    private string BuildFullDatabaseContext(bool includeSensitiveNotes)
     {
-        var shiftData = JsonStore.Load<ShiftDataFile>(_shiftDataPath);
-        var crmData = JsonStore.Load<CrmDataFile>(_crmDataPath);
+        var shiftData = ShiftDataStore.Load();
+        var crmData = CrmDataStore.Load();
 
-        var shifts = (shiftData?.Shifts ?? new List<ShiftEntry>())
+        var shifts = (shiftData.Shifts ?? new List<ShiftEntry>())
             .OrderByDescending(s => s.Timestamp)
             .Take(MaxRecordsPerType)
             .ToList();
-        var fans = (crmData?.Records ?? new List<CrmEntry>())
+        var fans = (crmData.Records ?? new List<CrmEntry>())
             .OrderByDescending(r => r.CreatedAt)
             .Take(MaxRecordsPerType)
             .ToList();
 
+        const string hidden = "(hidden)";
+
         var sb = new StringBuilder();
-        sb.AppendLine($"SHIFTS ({shifts.Count} of {shiftData?.Shifts?.Count ?? 0} total, most recent first):");
+        sb.AppendLine($"SHIFTS ({shifts.Count} of {shiftData.Shifts?.Count ?? 0} total, most recent first):");
         foreach (var s in shifts)
         {
             var worked = new TimeSpan(0, 0, s.ElapsedHours, s.ElapsedMinutes, s.ElapsedSeconds);
-            sb.AppendLine($"- {s.Timestamp:yyyy-MM-dd} | Model: {s.Model} | Moderator: {s.Moderator} | Worked: {worked:hh\\:mm\\:ss} | Rating: {s.PerformanceRating}/5 | Summary: {s.SessionSummary} | Good members: {s.GoodMembers} | Issues: {s.IssuesToWatch}");
+            var summary = includeSensitiveNotes ? s.SessionSummary : hidden;
+            var goodMembers = includeSensitiveNotes ? s.GoodMembers : hidden;
+            var issues = includeSensitiveNotes ? s.IssuesToWatch : hidden;
+            sb.AppendLine($"- {s.Timestamp:yyyy-MM-dd} | Model: {s.Model} | Moderator: {s.Moderator} | Worked: {worked:hh\\:mm\\:ss} | Rating: {s.PerformanceRating}/5 | Summary: {summary} | Good members: {goodMembers} | Issues: {issues}");
         }
 
         sb.AppendLine();
-        sb.AppendLine($"FANS/CRM ({fans.Count} of {crmData?.Records?.Count ?? 0} total, most recently touched first):");
+        sb.AppendLine($"FANS/CRM ({fans.Count} of {crmData.Records?.Count ?? 0} total, most recently touched first):");
         foreach (var r in fans)
         {
-            sb.AppendLine($"- {r.CreatedAt:yyyy-MM-dd} | User: {r.User} | Site: {r.Site} | Model: {r.Model} | SpendTier: {r.SpendTier}/5 | Habits: {r.Habits} | Triggers: {r.Triggers} | Notes: {r.Notes}");
+            var habits = includeSensitiveNotes ? r.Habits : hidden;
+            var triggers = includeSensitiveNotes ? r.Triggers : hidden;
+            var notes = includeSensitiveNotes ? r.Notes : hidden;
+            sb.AppendLine($"- {r.CreatedAt:yyyy-MM-dd} | User: {r.User} | Site: {r.Site} | Model: {r.Model} | SpendTier: {r.SpendTier}/5 | Habits: {habits} | Triggers: {triggers} | Notes: {notes}");
+        }
+
+        if (!includeSensitiveNotes)
+        {
+            sb.AppendLine();
+            sb.AppendLine("(Sensitive notes/triggers text is withheld — \"Include sensitive notes in AI requests\" is off in Settings.)");
         }
 
         return sb.ToString();
     }
 
-    private void ShowInfoDialog(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            Height = 190,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var okBtn = new Button
-        {
-            Content = "OK",
-            Width = 100,
-            Height = 30,
-            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
-            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
-        };
-        okBtn.Click += (s, e) => dialog.Close();
-
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-        dialog.ShowDialog(this);
-    }
+    private void ShowInfoDialog(string title, string message) => AppDialog.ShowInfo(this, title, message);
 }

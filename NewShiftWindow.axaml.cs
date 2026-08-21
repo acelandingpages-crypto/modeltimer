@@ -8,6 +8,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using System;
 using System.IO;
+using System.Linq;
 
 namespace ModelTimer;
 
@@ -23,12 +24,10 @@ public partial class NewShiftWindow : Window
     private ComboBox? _activeComboBox;
     private string _lastSelectedModel = string.Empty;
     private string _lastSelectedModerator = string.Empty;
-    private string _dataFilePath = string.Empty;
 
     public NewShiftWindow()
     {
         InitializeComponent();
-        _dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
         PopulateDurationDropdowns();
         LoadSavedData();
         UpdateStartButtonState();
@@ -83,8 +82,7 @@ public partial class NewShiftWindow : Window
 
     private void LoadSavedData()
     {
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
-        if (data == null) return;
+        var data = ShiftDataStore.Load();
 
         if (data.Models != null)
         {
@@ -116,16 +114,16 @@ public partial class NewShiftWindow : Window
             if (item is string s) moderators.Add(s);
         }
 
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath) ?? new ShiftDataFile();
+        var data = ShiftDataStore.Load();
         data.Models = models;
         data.Moderators = moderators;
 
-        JsonStore.Save(_dataFilePath, data);
+        ShiftDataStore.Save(data);
     }
 
     private void SaveShiftHistory()
     {
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath) ?? new ShiftDataFile();
+        var data = ShiftDataStore.Load();
 
         data.Models ??= new System.Collections.Generic.List<string>();
         data.Moderators ??= new System.Collections.Generic.List<string>();
@@ -154,7 +152,7 @@ public partial class NewShiftWindow : Window
         data.Shifts ??= new System.Collections.Generic.List<ShiftEntry>();
         data.Shifts.Add(entry);
 
-        JsonStore.Save(_dataFilePath, data);
+        ShiftDataStore.Save(data);
     }
 
     private void UpdateStartButtonState()
@@ -196,12 +194,25 @@ public partial class NewShiftWindow : Window
         var text = comboBox.Text?.Trim();
         if (!string.IsNullOrEmpty(text))
         {
-            if (!comboBox.Items.Contains(text))
+            var existing = comboBox.Items.OfType<string>()
+                .FirstOrDefault(i => string.Equals(i, text, StringComparison.OrdinalIgnoreCase));
+
+            if (existing == null)
             {
                 comboBox.Items.Add(text);
                 comboBox.SelectedItem = text;
                 _activeComboBox = comboBox;
                 SaveData();
+                UpdateStartButtonState();
+            }
+            else
+            {
+                // Same name already on file (possibly different casing) - reuse the existing
+                // entry instead of creating a near-duplicate that would fragment this person's
+                // stats and legend color across two rows.
+                comboBox.SelectedItem = existing;
+                comboBox.Text = existing;
+                _activeComboBox = comboBox;
                 UpdateStartButtonState();
             }
         }
@@ -222,7 +233,7 @@ public partial class NewShiftWindow : Window
 
         if (newText == oldText) return;
 
-        if (comboBox.Items.Contains(newText))
+        if (comboBox.Items.OfType<string>().Any(i => string.Equals(i, newText, StringComparison.OrdinalIgnoreCase)))
         {
             comboBox.BorderBrush = new SolidColorBrush(Color.Parse("#FFFF0000"));
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };

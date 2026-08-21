@@ -17,7 +17,6 @@ public partial class EditShiftReportWindow : Window
     private readonly string _moderator;
     private readonly DateTime _timestamp;
     private readonly TimeSpan _elapsed;
-    private readonly string _dataFilePath;
     public bool Saved { get; private set; }
 
     public EditShiftReportWindow(string model, string moderator, DateTime timestamp, TimeSpan elapsed,
@@ -29,7 +28,6 @@ public partial class EditShiftReportWindow : Window
         _moderator = moderator;
         _timestamp = timestamp;
         _elapsed = elapsed;
-        _dataFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
 
         RecapText.Text = $"Model: {model}  |  Moderator: {moderator}  |  Worked: {elapsed:hh\\:mm\\:ss}";
 
@@ -81,8 +79,8 @@ public partial class EditShiftReportWindow : Window
 
     private bool SaveReport()
     {
-        var data = JsonStore.Load<ShiftDataFile>(_dataFilePath);
-        if (data?.Shifts == null) return false;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null) return false;
 
         var entry = data.Shifts.FirstOrDefault(s =>
             s.Model == _model &&
@@ -96,7 +94,7 @@ public partial class EditShiftReportWindow : Window
         entry.IssuesToWatch = IssuesTextBox.Text?.Trim() ?? string.Empty;
         entry.PerformanceRating = RatingComboBox.SelectedIndex;
 
-        return JsonStore.Save(_dataFilePath, data);
+        return ShiftDataStore.Save(data);
     }
 
     private async void BtnDraftAi_Click(object sender, RoutedEventArgs e)
@@ -108,8 +106,7 @@ public partial class EditShiftReportWindow : Window
             return;
         }
 
-        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        var settings = SettingsStore.Load();
 
         if (!AiSummaryService.IsConfigured(settings))
         {
@@ -117,12 +114,14 @@ public partial class EditShiftReportWindow : Window
             return;
         }
 
+        if (!await AiConsentService.EnsureConsentAsync(this, settings)) return;
+
         var originalContent = BtnDraftAi.Content;
         try
         {
             BtnDraftAi.IsEnabled = false;
             BtnDraftAi.Content = "Polishing...";
-            var polished = await AiSummaryService.PolishSummaryAsync(settings!, _model, _moderator, _elapsed, notes);
+            var polished = await AiSummaryService.PolishSummaryAsync(settings, _model, _moderator, _elapsed, notes);
             SummaryTextBox.Text = polished;
         }
         catch (Exception ex)
@@ -136,40 +135,5 @@ public partial class EditShiftReportWindow : Window
         }
     }
 
-    private void ShowInfoDialog(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            Height = 190,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var okBtn = new Button
-        {
-            Content = "OK",
-            Width = 100,
-            Height = 30,
-            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
-            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
-        };
-        okBtn.Click += (s, e) => dialog.Close();
-
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-        dialog.ShowDialog(this);
-    }
+    private void ShowInfoDialog(string title, string message) => AppDialog.ShowInfo(this, title, message);
 }

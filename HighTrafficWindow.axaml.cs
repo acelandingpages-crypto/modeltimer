@@ -20,27 +20,36 @@ public partial class HighTrafficWindow : Window
 {
     private static readonly string[] SpendTierLabels = { "-", "$", "$$", "$$$", "$$$$", "$$$$$" };
 
-    private string _dataFilePath = string.Empty;
     private List<CrmEntry> _records = new();
     private int _nextId = 1;
     private int _editingId = 0;
+    private CrmEntry? _lastDeletedEntry;
+    private DispatcherTimer? _undoTimer;
 
     public HighTrafficWindow()
     {
         InitializeComponent();
-        _dataFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crm_data.json");
         LoadRecords();
         LoadModelsList();
         RefreshTable();
         ApplyTheme();
         SiteFilterComboBox.SelectionChanged += SiteFilterComboBox_SelectionChanged;
+
+        CrmDataStore.Changed += CrmDataStore_Changed;
+        Closed += (s, e) => CrmDataStore.Changed -= CrmDataStore_Changed;
+    }
+
+    private void CrmDataStore_Changed()
+    {
+        if (_editingId != 0) return; // don't yank the form out from under an in-progress edit
+        LoadRecords();
+        RefreshTable();
     }
 
     private void LoadModelsList()
     {
-        var shiftDataPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        var data = JsonStore.Load<ShiftDataFile>(shiftDataPath);
-        if (data?.Models == null) return;
+        var data = ShiftDataStore.Load();
+        if (data.Models == null) return;
         foreach (var model in data.Models)
         {
             ModelComboBox.Items.Add(model);
@@ -78,8 +87,8 @@ public partial class HighTrafficWindow : Window
         _records.Clear();
         _nextId = 1;
 
-        var data = JsonStore.Load<CrmDataFile>(_dataFilePath);
-        if (data?.Records == null) return;
+        var data = CrmDataStore.Load();
+        if (data.Records == null) return;
         foreach (var r in data.Records.OrderBy(x => x.Id))
         {
             r.User ??= string.Empty;
@@ -93,180 +102,33 @@ public partial class HighTrafficWindow : Window
         }
     }
 
-    private void SaveRecords()
+    private bool SaveRecords()
     {
         var data = new CrmDataFile { Records = _records };
-        JsonStore.Save(_dataFilePath, data);
+        return CrmDataStore.Save(data);
     }
 
     private void RefreshTable()
     {
-        TableGrid.Children.Clear();
-        TableGrid.RowDefinitions.Clear();
-
         var siteFilter = SiteFilterComboBox.SelectedItem as ComboBoxItem;
         var filterText = siteFilter?.Content?.ToString() ?? "All";
         var filtered = _records.Where(r => filterText == "All" || r.Site.Equals(filterText, StringComparison.OrdinalIgnoreCase)).ToList();
 
-        if (!filtered.Any())
-        {
-            NoDataText.IsVisible = true;
-            return;
-        }
-        NoDataText.IsVisible = false;
-
-        AddHeaderRow();
-
-        int rowIndex = 1;
-        foreach (var item in filtered)
-        {
-            AddDataRow(item, rowIndex++);
-        }
+        CrmGrid.ItemsSource = filtered;
+        NoDataText.IsVisible = filtered.Count == 0;
     }
 
-    private void AddHeaderRow()
+    private void NotesCell_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var headers = new[] { "User", "Model", "Site", "Spend", "Habits", "Triggers", "Notes", "Action" };
-        for (int col = 0; col < headers.Length; col++)
+        if (sender is Control { DataContext: CrmEntry item } && !string.IsNullOrEmpty(item.Notes))
         {
-            var border = new Border
-            {
-                Background = new SolidColorBrush(Color.Parse("#FF3E3E42")),
-                BorderBrush = new SolidColorBrush(Color.Parse("#FF555555")),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(6)
-            };
-            var text = new TextBlock
-            {
-                Text = headers[col],
-                Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-                FontWeight = FontWeight.Bold,
-                FontSize = 12
-            };
-            border.Child = text;
-            Grid.SetRow(border, 0);
-            Grid.SetColumn(border, col);
-            TableGrid.Children.Add(border);
+            ShowNotesPopup(item.Notes);
         }
-    }
-
-    private void AddDataRow(CrmEntry item, int rowIndex)
-    {
-        TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var bgBrush = rowIndex % 2 == 0
-            ? new SolidColorBrush(Color.Parse("#FF2D2D30"))
-            : new SolidColorBrush(Color.Parse("#FF252526"));
-
-        var cells = new[] { item.User, item.Model, item.Site, SpendTierLabels[Math.Clamp(item.SpendTier, 0, SpendTierLabels.Length - 1)], item.Habits, item.Triggers, item.Notes };
-
-        for (int col = 0; col < cells.Length; col++)
-        {
-            var border = new Border
-            {
-                Background = bgBrush,
-                BorderBrush = new SolidColorBrush(Color.Parse("#FF555555")),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(6)
-            };
-
-            if (col == 6)
-            {
-                var text = new SelectableTextBlock
-                {
-                    Text = cells[col] ?? string.Empty,
-                    Foreground = new SolidColorBrush(Color.Parse("#FFa6e3a1")),
-                    FontSize = 12,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                border.Child = text;
-                
-                border.PointerEntered += (s, e) => border.Cursor = new Cursor(StandardCursorType.Hand);
-                border.PointerExited += (s, e) => border.Cursor = Cursor.Default;
-                border.PointerPressed += (s, e) =>
-                {
-                    if (!string.IsNullOrEmpty(item.Notes))
-                    {
-                        ShowNotesPopup(item.Notes);
-                    }
-                };
-            }
-            else if (col == 0)
-            {
-                var textBox = new TextBox
-                {
-                    Text = cells[col] ?? string.Empty,
-                    Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-                    FontSize = 12,
-                    IsReadOnly = true,
-                    Background = Brushes.Transparent,
-                    BorderThickness = new Thickness(0)
-                };
-                border.Child = textBox;
-            }
-            else
-            {
-                var text = new TextBlock
-                {
-                    Text = cells[col] ?? string.Empty,
-                    Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-                    FontSize = 12,
-                    TextTrimming = TextTrimming.CharacterEllipsis
-                };
-                border.Child = text;
-            }
-            Grid.SetRow(border, rowIndex);
-            Grid.SetColumn(border, col);
-            TableGrid.Children.Add(border);
-        }
-
-        // Action column with Edit and Delete buttons
-        var actionBorder = new Border
-        {
-            Background = bgBrush,
-            BorderBrush = new SolidColorBrush(Color.Parse("#FF555555")),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(4)
-        };
-        var actionGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto"), ColumnSpacing = 8, Width = 120 };
-        
-        var editBtn = new Button
-        {
-            Content = "Edit",
-            Tag = item.Id,
-            Background = new SolidColorBrush(Color.Parse("#FFcba6f7")),
-            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-            Padding = new Thickness(6, 2),
-            Height = 25
-        };
-        editBtn.Click += EditButton_Click;
-        Grid.SetColumn(editBtn, 0);
-        actionGrid.Children.Add(editBtn);
-        
-        var deleteBtn = new Button
-        {
-            Content = "Delete",
-            Tag = item.Id,
-            Background = new SolidColorBrush(Color.Parse("#FFFF0000")),
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            Padding = new Thickness(6, 2),
-            Height = 25
-        };
-        deleteBtn.Click += DeleteButton_Click;
-        Grid.SetColumn(deleteBtn, 1);
-        actionGrid.Children.Add(deleteBtn);
-        
-        actionBorder.Child = actionGrid;
-        Grid.SetRow(actionBorder, rowIndex);
-        Grid.SetColumn(actionBorder, 7);
-        TableGrid.Children.Add(actionBorder);
     }
 
     private void EditButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not int id) return;
-        var item = _records.FirstOrDefault(r => r.Id == id);
-        if (item == null) return;
+        if (sender is not Button { Tag: CrmEntry item }) return;
 
         _editingId = item.Id;
         UserTextBox.Text = item.User;
@@ -279,11 +141,13 @@ public partial class HighTrafficWindow : Window
         SpendTierComboBox.SelectedIndex = Math.Clamp(item.SpendTier, 0, SpendTierComboBox.ItemCount - 1);
     }
 
-    private void DeleteButton_Click(object? sender, RoutedEventArgs e)
+    private async void DeleteButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not int id) return;
-        var item = _records.FirstOrDefault(r => r.Id == id);
-        if (item == null) return;
+        if (sender is not Button { Tag: CrmEntry item }) return;
+
+        var confirmed = await AppDialog.ShowConfirm(this, "Delete Fan Record",
+            $"Delete the record for \"{item.User}\" on {item.Site}? You can undo this right after.");
+        if (!confirmed) return;
 
         _records.Remove(item);
         SaveRecords();
@@ -296,6 +160,40 @@ public partial class HighTrafficWindow : Window
         NotesTextBox.Text = string.Empty;
         PlatformComboBox.SelectedIndex = 0;
         SpendTierComboBox.SelectedIndex = 0;
+
+        ShowUndoBanner(item, $"Deleted the record for \"{item.User}\" on {item.Site}.");
+    }
+
+    private void ShowUndoBanner(CrmEntry removed, string message)
+    {
+        _lastDeletedEntry = removed;
+        UndoBannerText.Text = message;
+        UndoBanner.IsVisible = true;
+
+        _undoTimer?.Stop();
+        _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        _undoTimer.Tick += (s, e) =>
+        {
+            _undoTimer?.Stop();
+            UndoBanner.IsVisible = false;
+            _lastDeletedEntry = null;
+        };
+        _undoTimer.Start();
+    }
+
+    private void BtnUndoDelete_Click(object? sender, RoutedEventArgs e)
+    {
+        _undoTimer?.Stop();
+        UndoBanner.IsVisible = false;
+
+        if (_lastDeletedEntry == null) return;
+
+        _records.Add(_lastDeletedEntry);
+        if (_lastDeletedEntry.Id >= _nextId) _nextId = _lastDeletedEntry.Id + 1;
+        SaveRecords();
+
+        _lastDeletedEntry = null;
+        RefreshTable();
     }
 
     private void BtnSaveProfile_Click(object sender, RoutedEventArgs e)
@@ -311,12 +209,14 @@ public partial class HighTrafficWindow : Window
 
         if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(siteText))
         {
+            AppDialog.ShowInfo(this, "Missing Info", "Username and Site are both required to save a fan record.");
             return;
         }
 
         var existing = _records.FirstOrDefault(r => r.User.Equals(user, StringComparison.OrdinalIgnoreCase) && r.Site.Equals(siteText, StringComparison.OrdinalIgnoreCase));
         if (existing != null)
         {
+            AppDialog.ShowInfo(this, "Already on File", $"\"{user}\" on {siteText} is already in the CRM. Use Edit on that row to update it instead.");
             return;
         }
 
@@ -358,12 +258,14 @@ public partial class HighTrafficWindow : Window
 
         if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(siteText))
         {
+            AppDialog.ShowInfo(this, "Missing Info", "Username and Site are both required to save a fan record.");
             return;
         }
 
         var existing = _records.FirstOrDefault(r => r.Id == _editingId);
         if (existing == null)
         {
+            AppDialog.ShowInfo(this, "Nothing to Update", "Click Edit on a row first, then Update.");
             return;
         }
 
@@ -397,17 +299,19 @@ public partial class HighTrafficWindow : Window
             return;
         }
 
-        var settingsPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
+        var settings = SettingsStore.Load();
         if (!AiSummaryService.IsConfigured(settings))
         {
             ShowInfoDialog("AI Not Set Up", "Add a provider and API key under Settings to enable tier suggestions and duplicate checks.");
             return;
         }
 
-        var habits = HabitsTextBox.Text?.Trim() ?? string.Empty;
-        var triggers = TriggersTextBox.Text?.Trim() ?? string.Empty;
-        var notes = NotesTextBox.Text?.Trim() ?? string.Empty;
+        if (!await AiConsentService.EnsureConsentAsync(this, settings)) return;
+
+        var includeSensitive = settings.AiIncludeSensitiveNotes;
+        var habits = includeSensitive ? HabitsTextBox.Text?.Trim() ?? string.Empty : string.Empty;
+        var triggers = includeSensitive ? TriggersTextBox.Text?.Trim() ?? string.Empty : string.Empty;
+        var notes = includeSensitive ? NotesTextBox.Text?.Trim() ?? string.Empty : string.Empty;
         var existingUsers = _records
             .Where(r => r.Id != _editingId)
             .Select(r => r.User)
@@ -421,7 +325,7 @@ public partial class HighTrafficWindow : Window
             BtnSuggestTag.IsEnabled = false;
             BtnSuggestTag.Content = "Checking...";
 
-            var suggestion = await AiSummaryService.SuggestFanTagAsync(settings!, user, habits, triggers, notes, existingUsers);
+            var suggestion = await AiSummaryService.SuggestFanTagAsync(settings, user, habits, triggers, notes, existingUsers);
 
             var appliedTier = false;
             if (suggestion.SuggestedTier is >= 1 and <= 5 && SpendTierComboBox.SelectedIndex == 0)
@@ -454,42 +358,7 @@ public partial class HighTrafficWindow : Window
         }
     }
 
-    private void ShowInfoDialog(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            Height = 190,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var okBtn = new Button
-        {
-            Content = "OK",
-            Width = 100,
-            Height = 30,
-            Background = new SolidColorBrush(Color.Parse("#FFf9e2af")),
-            Foreground = new SolidColorBrush(Color.Parse("#FF000000")),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
-        };
-        okBtn.Click += (s, e) => dialog.Close();
-
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-        dialog.ShowDialog(this);
-    }
+    private void ShowInfoDialog(string title, string message) => AppDialog.ShowInfo(this, title, message);
 
     private void ShowNotesPopup(string notes)
     {
@@ -526,7 +395,12 @@ public partial class HighTrafficWindow : Window
 
     private void ApplyTheme()
     {
-        var isLight = false;
+        var settings = SettingsStore.Load();
+        var isLight = settings.Theme == "Light";
+        if (isLight)
+        {
+            RequestedThemeVariant = ThemeVariant.Light;
+        }
         var bgMain = isLight ? "#FFF0F0F0" : "#FF1E1E1E";
         var bgSurface = isLight ? "#FFFFFFFF" : "#FF252526";
         var bgToolbar = isLight ? "#FFE0E0E0" : "#FF3E3E42";

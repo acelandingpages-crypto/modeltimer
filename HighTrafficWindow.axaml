@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ModelTimer"
         x:Class="ModelTimer.HighTrafficWindow"
         Title="High Traffic"
         Width="900"
@@ -89,10 +90,52 @@
     <!-- Row 2: CRM Data Table -->
     <Border Grid.Row="2" Padding="10" Background="#FF1E1E1E">
       <Grid RowDefinitions="*,Auto">
-        <ScrollViewer Grid.Row="0" Name="TableScrollViewer">
-          <Grid Name="TableGrid" ColumnDefinitions="120,100,100,70,*,*,*,120"/>
-        </ScrollViewer>
-        <TextBlock Grid.Row="1" Name="NoDataText" Text="No records found." Foreground="#FF888888" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0" IsVisible="False"/>
+        <DataGrid Grid.Row="0" Name="CrmGrid"
+                  x:DataType="local:CrmEntry"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserSortColumns="True"
+                  CanUserResizeColumns="True"
+                  GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column"
+                  RowBackground="#FF252526"
+                  Background="#FF1E1E1E"
+                  BorderThickness="0">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="User" Binding="{Binding User}" Width="120"/>
+            <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="100"/>
+            <DataGridTextColumn Header="Site" Binding="{Binding Site}" Width="100"/>
+            <DataGridTextColumn Header="Spend" Binding="{Binding SpendTierLabel}" Width="70"/>
+            <DataGridTextColumn Header="Habits" Binding="{Binding Habits}" Width="*"/>
+            <DataGridTextColumn Header="Triggers" Binding="{Binding Triggers}" Width="*"/>
+            <DataGridTemplateColumn Header="Notes" Width="*">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="local:CrmEntry">
+                  <TextBlock Text="{Binding Notes}" Foreground="#FFa6e3a1" FontSize="12"
+                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                             Cursor="Hand" PointerPressed="NotesCell_PointerPressed"/>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Header="Action" Width="130">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="local:CrmEntry">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Content="Edit" Tag="{Binding}" Background="#FFcba6f7" Foreground="Black" Padding="6,2" Height="25" Click="EditButton_Click"/>
+                    <Button Content="Delete" Tag="{Binding}" Background="#FFFF0000" Foreground="White" Padding="6,2" Height="25" Click="DeleteButton_Click"/>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+        <TextBlock Grid.Row="0" Name="NoDataText" Text="No records found." Foreground="#FF888888" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="False"/>
+        <Border Grid.Row="1" Name="UndoBanner" Background="#FF3E3E42" BorderBrush="#FFcba6f7" BorderThickness="0,1,0,0" Padding="12,8" IsVisible="False" Margin="0,6,0,0" CornerRadius="4">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Name="UndoBannerText" Text="Deleted." Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Name="BtnUndoDelete" Content="Undo" Height="26" Padding="12,0" Background="#FFa6e3a1" Foreground="Black" Click="BtnUndoDelete_Click"/>
+          </Grid>
+        </Border>
       </Grid>
     </Border>
   </Grid>

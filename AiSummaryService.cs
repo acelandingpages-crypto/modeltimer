@@ -41,7 +41,7 @@ internal class FanTagSuggestion
 internal static class AiSummaryService
 {
     private const string AnthropicModel = "claude-opus-5";
-    private const string OpenRouterModel = "nvidia/nemotron-3-super-120b-a12b:free";
+    private const string OpenRouterModel = "openrouter/free";
     private const string OpenRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
 
     private const string AskJsonSchema = """
@@ -114,6 +114,38 @@ internal static class AiSummaryService
             $"RAW NOTES:\n{moderatorNotes}";
 
         return await SendAsync(settings, prompt, 512);
+    }
+
+    public static async Task<string> GenerateMilestoneMessageAsync(AppSettings settings, string model, string moderator, TimeSpan elapsed, TimeSpan planned, double progressPercent)
+    {
+        var prompt =
+            "You are writing a single short status line shown live on a content-moderation studio's shift timer " +
+            "while a moderator is actively working - it refreshes every 10% of shift progress. Write ONE short " +
+            "line that is EITHER (a) a genuinely motivating line for someone this deep into a work shift - not " +
+            "generic corporate hype, a little playful or wry is good, but it should read like it actually " +
+            "understands what a long shift feels like - OR (b) a practical, low-key reminder for the moderator " +
+            "to check in on the model they're working with: is she doing okay, does she need anything (water, a " +
+            "break, backup), is there anything that would make the two of them working together easier right " +
+            "now. Pick whichever kind fits better this far into the shift - vary it rather than always picking " +
+            "the same kind. Keep it natural, specific, and low-key - never preachy or corporate. Under 45 " +
+            "characters if at all possible. You may lead with a single relevant emoji. Respond with ONLY the " +
+            "line itself - no quotes, no markdown, no explanation, nothing else.\n\n" +
+            $"Progress: {progressPercent:0}% through a planned {FormatClock(planned)} shift " +
+            $"({FormatClock(elapsed)} worked so far) | Model: {model} | Moderator: {moderator}";
+
+        var raw = await SendAsync(settings, prompt, 60);
+        return CleanMilestoneText(raw);
+    }
+
+    internal static string FormatClock(TimeSpan span) => span.ToString(span.TotalHours >= 1 ? @"h\h\ mm\m" : @"mm\m");
+
+    internal static string CleanMilestoneText(string raw)
+    {
+        var text = raw.Trim().Trim('"');
+        // This lands in a small, fixed-size status label - guard against a verbose or
+        // off-instruction response blowing out the layout.
+        if (text.Length > 90) text = text[..90].TrimEnd() + "…";
+        return text;
     }
 
     public static async Task<AskResult> AskAsync(AppSettings settings, string question, string databaseJson)
@@ -201,7 +233,7 @@ internal static class AiSummaryService
         }
     }
 
-    private static AskResult ParseAskResult(string raw)
+    internal static AskResult ParseAskResult(string raw)
     {
         var cleaned = StripJsonFences(raw);
 
@@ -272,7 +304,7 @@ internal static class AiSummaryService
         };
     }
 
-    private static string StripJsonFences(string raw)
+    internal static string StripJsonFences(string raw)
     {
         var cleaned = raw.Trim();
         if (!cleaned.StartsWith("```", StringComparison.Ordinal)) return cleaned;

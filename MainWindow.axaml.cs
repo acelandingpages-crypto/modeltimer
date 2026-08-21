@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private TimeSpan _elapsed = TimeSpan.Zero;
     private bool _isRunning = false;
     private bool _isPaused = false;
+    private long _lostTimeSeconds = 0;
+    private DateTime? _pauseStartedAt;
 
     private string _currentModel = string.Empty;
     private string _currentModerator = string.Empty;
@@ -39,8 +41,11 @@ public partial class MainWindow : Window
     private string _showHotkey = "ctrl + s";
     private string _privateHotkey = "ctrl + p";
     private string _typingHotkey = "ctrl + k";
-    private string _activeShiftPath = string.Empty;
     private bool _closeConfirmed;
+
+    private int _milestoneBucket = -1;
+    private bool _isFetchingMilestone;
+    private string? _aiMilestoneMessage;
 
     public MainWindow()
     {
@@ -58,6 +63,7 @@ public partial class MainWindow : Window
         LoadThemeOnStartup();
 
         Dispatcher.UIThread.Post(() => CheckForActiveShift(), DispatcherPriority.Loaded);
+        Dispatcher.UIThread.Post(() => _ = CheckForUpdatesOnStartupAsync(), DispatcherPriority.Loaded);
 
         try
         {
@@ -99,10 +105,11 @@ public partial class MainWindow : Window
         if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
 
         ElapsedText.Text = _elapsed.ToString(@"hh\:mm\:ss");
-        MilestoneText.Text = _isRunning ? GetMilestoneMessage(_elapsed) : string.Empty;
 
-        double progressPercent = _totalTime.TotalSeconds > 0 ? (_elapsed.TotalSeconds / _totalTime.TotalSeconds) * 100 : 0;
-        if (progressPercent > 100) progressPercent = 100;
+        double rawProgressPercent = _totalTime.TotalSeconds > 0 ? (_elapsed.TotalSeconds / _totalTime.TotalSeconds) * 100 : 0;
+        UpdateMilestoneText(rawProgressPercent);
+
+        double progressPercent = Math.Min(100, rawProgressPercent);
         ProgressText.Text = $"{progressPercent:F0}%";
 
         double totalWidth = ProgressBar.Bounds.Width;
@@ -115,41 +122,119 @@ public partial class MainWindow : Window
         if (_isRunning && !_isPaused)
         {
             var remainingSeconds = remaining.TotalSeconds;
-            if (remainingSeconds <= 0 && !_notifiedComplete && _notifyOnShiftComplete)
-            {
-                _notifiedComplete = true;
-                ShiftStatusText.Text = "Shift complete!";
-                ShiftStatusText.Foreground = new SolidColorBrush(Color.Parse("#FF00FF00"));
-            }
-            else if (remainingSeconds >= 299 && remainingSeconds <= 301 && !_notified5Min && _warn5Min)
-            {
-                _notified5Min = true;
-                ShiftStatusText.Text = "5 minutes remaining!";
-                ShiftStatusText.Foreground = new SolidColorBrush(Color.Parse("#FFFF0000"));
-                Dispatcher.UIThread.Post(() => ShowWarningDialog("5 Minute Warning", "Only 5 minutes remaining in this shift!"), DispatcherPriority.Loaded);
-            }
-            else if (remainingSeconds >= 899 && remainingSeconds <= 901 && !_notified15Min && _warn15Min)
+
+            // Threshold checks below fire once remaining has crossed *below* each mark, not on
+            // an exact-second match - a DispatcherTimer tick lost to sleep/resume or load can
+            // otherwise jump straight past a narrow window and silently skip the warning.
+            if (!_notified15Min && _warn15Min && remainingSeconds > 0 && remainingSeconds <= 900)
             {
                 _notified15Min = true;
                 ShiftStatusText.Text = "15 minutes remaining!";
                 ShiftStatusText.Foreground = new SolidColorBrush(Color.Parse("#FFFFAA00"));
                 Dispatcher.UIThread.Post(() => ShowWarningDialog("15 Minute Warning", "Only 15 minutes remaining in this shift!"), DispatcherPriority.Loaded);
             }
+
+            if (!_notified5Min && _warn5Min && remainingSeconds > 0 && remainingSeconds <= 300)
+            {
+                _notified5Min = true;
+                ShiftStatusText.Text = "5 minutes remaining!";
+                ShiftStatusText.Foreground = new SolidColorBrush(Color.Parse("#FFFF0000"));
+                Dispatcher.UIThread.Post(() => ShowWarningDialog("5 Minute Warning", "Only 5 minutes remaining in this shift!"), DispatcherPriority.Loaded);
+            }
+
+            if (remainingSeconds <= 0)
+            {
+                if (!_notifiedComplete)
+                {
+                    _notifiedComplete = true;
+                    ShiftStatusText.Foreground = new SolidColorBrush(Color.Parse("#FF00FF00"));
+                    if (_notifyOnShiftComplete)
+                    {
+                        Dispatcher.UIThread.Post(() => ShowWarningDialog("Shift Complete", "The planned shift duration has been reached."), DispatcherPriority.Loaded);
+                    }
+                }
+
+                // Keep counting so an unattended overrun is visible in real time, not just a
+                // one-time "complete" label that then goes stale for however long the shift
+                // actually keeps running past its planned duration.
+                var overrun = _elapsed - _totalTime;
+                ShiftStatusText.Text = overrun.TotalSeconds < 1
+                    ? "Shift complete!"
+                    : $"Shift complete! +{overrun:hh\\:mm\\:ss} over";
+            }
         }
     }
 
-    private string GetMilestoneMessage(TimeSpan elapsed)
+    /// <summary>Deterministic fallback used whenever AI isn't configured/consented, and as the
+    /// immediate placeholder for a new milestone while an AI line for it is still in flight.</summary>
+    private string GetMilestoneMessage(double progressPercent)
     {
-        var hours = elapsed.TotalHours;
-        return hours switch
+        return progressPercent switch
         {
-            >= 5 => "🏆 5+ hours — legendary shift!",
-            >= 4 => "🚀 4 hours — powering through!",
-            >= 3 => "💪 3 hours — crushing it!",
-            >= 2 => "⚡ 2 hours — great pace!",
-            >= 1 => "🔥 1 hour in — warmed up!",
+            >= 100 => "🏁 Shift complete — nice work!",
+            >= 90 => "🏆 Almost there — final stretch!",
+            >= 75 => "💪 75%+ done — strong pace!",
+            >= 50 => "⚡ Halfway there — keep it up!",
+            >= 25 => "🔥 Good progress — stay sharp!",
+            >= 10 => "🙂 Warmed up and rolling.",
             _ => "Just getting started..."
         };
+    }
+
+    /// <summary>Refreshes the on-timer status line. Every 10% of shift progress, it tries to have
+    /// AI write a fresh line for that milestone - alternating between motivation and practical
+    /// reminders to check in on the model (see AiSummaryService.GenerateMilestoneMessageAsync).
+    /// The deterministic message above is shown immediately and stays up if AI isn't set up,
+    /// hasn't been consented to yet (see AiConsentService - this runs automatically, so it must
+    /// never itself prompt for consent), or the request fails for any reason.</summary>
+    private void UpdateMilestoneText(double progressPercent)
+    {
+        if (!_isRunning)
+        {
+            MilestoneText.Text = string.Empty;
+            return;
+        }
+
+        var bucket = (int)(progressPercent / 10);
+        if (bucket != _milestoneBucket)
+        {
+            _milestoneBucket = bucket;
+            _aiMilestoneMessage = null;
+            _ = TryFetchAiMilestoneAsync(bucket, _elapsed, progressPercent);
+        }
+
+        MilestoneText.Text = _aiMilestoneMessage ?? GetMilestoneMessage(progressPercent);
+    }
+
+    private async Task TryFetchAiMilestoneAsync(int bucket, TimeSpan elapsedAtRequest, double progressPercent)
+    {
+        if (_isFetchingMilestone) return;
+
+        var settings = SettingsStore.Load();
+        if (!AiSummaryService.IsConfigured(settings) || !settings.AiConsentAcknowledged) return;
+
+        _isFetchingMilestone = true;
+        try
+        {
+            var message = await AiSummaryService.GenerateMilestoneMessageAsync(settings, _currentModel, _currentModerator, elapsedAtRequest, _totalTime, progressPercent);
+
+            // Only apply it if we're still on the same milestone and still running - a slow
+            // response for a milestone we've already moved past (or a shift that already ended)
+            // would otherwise overwrite whatever's showing now.
+            if (_isRunning && bucket == _milestoneBucket && !string.IsNullOrWhiteSpace(message))
+            {
+                _aiMilestoneMessage = message;
+                MilestoneText.Text = message;
+            }
+        }
+        catch
+        {
+            // Best-effort - the deterministic fallback message is already showing.
+        }
+        finally
+        {
+            _isFetchingMilestone = false;
+        }
     }
 
     private void StartResume_Click(object? sender, RoutedEventArgs e)
@@ -202,11 +287,15 @@ public partial class MainWindow : Window
         _elapsed = TimeSpan.Zero;
         _isRunning = true;
         _isPaused = false;
+        _lostTimeSeconds = 0;
+        _pauseStartedAt = null;
         _currentModel = model;
         _currentModerator = moderator;
         _notified15Min = false;
         _notified5Min = false;
         _notifiedComplete = false;
+        _milestoneBucket = -1;
+        _aiMilestoneMessage = null;
         _timer?.Start();
         UpdateButtonStates();
         UpdateShiftStatus();
@@ -221,23 +310,47 @@ public partial class MainWindow : Window
         {
             _isPaused = true;
             _timer?.Stop();
+            _pauseStartedAt = DateTime.Now;
             BtnPause.Content = "Resume";
         }
         else if (_isPaused)
         {
+            FlushPendingPause();
             _isPaused = false;
             _timer?.Start();
             BtnPause.Content = "Pause";
         }
     }
 
+    private void FlushPendingPause()
+    {
+        if (_pauseStartedAt.HasValue)
+        {
+            _lostTimeSeconds += (long)(DateTime.Now - _pauseStartedAt.Value).TotalSeconds;
+            _pauseStartedAt = null;
+        }
+    }
+
+    private long GetLostTimeSecondsIncludingOpenPause()
+    {
+        var total = _lostTimeSeconds;
+        if (_pauseStartedAt.HasValue)
+        {
+            total += (long)(DateTime.Now - _pauseStartedAt.Value).TotalSeconds;
+        }
+        return total;
+    }
+
     private void Stop_Click(object? sender, RoutedEventArgs e)
     {
         var actualElapsed = _elapsed;
+        var lostTimeSeconds = GetLostTimeSecondsIncludingOpenPause();
         var finishedModel = _currentModel;
         var finishedModerator = _currentModerator;
         StopTimer();
         _elapsed = TimeSpan.Zero;
+        _lostTimeSeconds = 0;
+        _pauseStartedAt = null;
         UpdateDisplay();
         UpdateButtonStates();
         UpdateShiftStatus();
@@ -249,7 +362,7 @@ public partial class MainWindow : Window
         if (_readyViewbox != null) _readyViewbox.IsVisible = true;
         ImageBorder.Background = new SolidColorBrush(Color.Parse("#FF2D2D30"));
 
-        SaveShiftStopTime(actualElapsed);
+        SaveShiftStopTime(actualElapsed, lostTimeSeconds);
         ClearActiveShiftState();
 
         var reportWindow = new ShiftReportWindow(finishedModel, finishedModerator, actualElapsed);
@@ -306,34 +419,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowWarningDialog(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 400,
-            Height = 200,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var okBtn = new Button { Content = "OK", Width = 100, Height = 30, Background = new SolidColorBrush(Color.Parse("#FFa6e3a1")), Foreground = new SolidColorBrush(Color.Parse("#FF000000")), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center };
-        okBtn.Click += (s, e) => dialog.Close();
-
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-        dialog.ShowDialog(this);
-    }
+    private void ShowWarningDialog(string title, string message) => AppDialog.ShowInfo(this, title, message);
 
     private void SetupShortcuts()
     {
@@ -545,9 +631,8 @@ public partial class MainWindow : Window
 
     private void LoadThemeOnStartup()
     {
-        var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-        var settings = JsonStore.Load<AppSettings>(settingsPath);
-        if (settings != null && settings.Theme == "Light")
+        var settings = SettingsStore.Load();
+        if (settings.Theme == "Light")
         {
             RequestedThemeVariant = ThemeVariant.Light;
             if (Application.Current is App app)
@@ -575,46 +660,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<bool> ShowConfirmCloseDialog()
+    private Task<bool> ShowConfirmCloseDialog()
     {
-        var dialog = new Window
-        {
-            Title = "Close ModelTimer?",
-            Width = 400,
-            Height = 200,
-            Background = new SolidColorBrush(Color.Parse("#FF1E1E1E")),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false
-        };
-
         var message = _isRunning
             ? "You have an active shift running. Closing will save your progress so you can resume it next time you open ModelTimer.\n\nAre you sure you want to close?"
             : "Are you sure you want to close ModelTimer?";
 
-        var panel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")),
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        var btnPanel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center };
-        var cancelBtn = new Button { Content = "Cancel", Width = 100, Height = 30, Background = new SolidColorBrush(Color.Parse("#FFa6e3a1")), Foreground = new SolidColorBrush(Color.Parse("#FF000000")) };
-        var closeBtn = new Button { Content = "Close", Width = 100, Height = 30, Background = new SolidColorBrush(Color.Parse("#FFC42B1C")), Foreground = new SolidColorBrush(Color.Parse("#FFFFFFFF")) };
-
-        var result = false;
-        cancelBtn.Click += (s, e2) => { result = false; dialog.Close(); };
-        closeBtn.Click += (s, e2) => { result = true; dialog.Close(); };
-
-        btnPanel.Children.Add(cancelBtn);
-        btnPanel.Children.Add(closeBtn);
-        panel.Children.Add(btnPanel);
-        dialog.Content = panel;
-
-        await dialog.ShowDialog(this);
-        return result;
+        return AppDialog.ShowConfirm(this, "Close ModelTimer?", message, confirmLabel: "Close");
     }
 
     protected override void OnClosed(EventArgs e)
@@ -632,11 +684,10 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 
-    private void SaveShiftStopTime(TimeSpan elapsed)
+    private void SaveShiftStopTime(TimeSpan elapsed, long lostTimeSeconds = 0)
     {
-        var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shift_data.json");
-        var data = JsonStore.Load<ShiftDataFile>(filePath);
-        if (data?.Shifts == null || data.Shifts.Count == 0) return;
+        var data = ShiftDataStore.Load();
+        if (data.Shifts == null || data.Shifts.Count == 0) return;
 
         var lastEntry = data.Shifts[^1];
         if (lastEntry.StopTime == null)
@@ -645,40 +696,59 @@ public partial class MainWindow : Window
             lastEntry.ElapsedHours = (int)elapsed.TotalHours;
             lastEntry.ElapsedMinutes = elapsed.Minutes;
             lastEntry.ElapsedSeconds = elapsed.Seconds;
-            JsonStore.Save(filePath, data);
+            lastEntry.LostTimeSeconds = (int)lostTimeSeconds;
+            ShiftDataStore.Save(data);
         }
     }
 
     private void SaveActiveShiftState()
     {
-        _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
         var state = new ActiveShiftState
         {
             Model = _currentModel,
             Moderator = _currentModerator,
             ElapsedSeconds = (long)_elapsed.TotalSeconds,
+            LostTimeSeconds = GetLostTimeSecondsIncludingOpenPause(),
             DurationHours = (int)_totalTime.TotalHours,
             DurationMinutes = _totalTime.Minutes
         };
-        JsonStore.Save(_activeShiftPath, state);
+        JsonStore.Save(AppPaths.ActiveShift, state);
     }
 
-    private ActiveShiftState? LoadActiveShiftState()
-    {
-        _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
-        return JsonStore.Load<ActiveShiftState>(_activeShiftPath);
-    }
+    private ActiveShiftState? LoadActiveShiftState() => JsonStore.Load<ActiveShiftState>(AppPaths.ActiveShift);
 
     private void ClearActiveShiftState()
     {
         try
         {
-            _activeShiftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_shift.json");
-            if (File.Exists(_activeShiftPath)) File.Delete(_activeShiftPath);
+            if (File.Exists(AppPaths.ActiveShift)) File.Delete(AppPaths.ActiveShift);
         }
         catch (Exception ex)
         {
-            JsonStore.LogError($"Failed to clear {_activeShiftPath}", ex);
+            JsonStore.LogError($"Failed to clear {AppPaths.ActiveShift}", ex);
+        }
+    }
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        try
+        {
+            var update = await AppUpdateService.CheckForUpdateAsync();
+            if (update == null) return;
+
+            var version = update.TargetFullRelease.Version;
+            var confirmed = await AppDialog.ShowConfirm(this, "Update Available",
+                $"ModelTimer {version} is available (you have {AppUpdateService.CurrentVersion}). Update and restart now?",
+                confirmLabel: "Update");
+            if (!confirmed) return;
+
+            await AppUpdateService.DownloadAndApplyAsync(update);
+            // A successful apply restarts the process itself - if we're still here, it failed.
+            AppDialog.ShowInfo(this, "Update Failed", "Couldn't download or apply the update. Try again later, or check error_log.txt.");
+        }
+        catch
+        {
+            // Best-effort - never let a background update check disrupt a moderator's shift.
         }
     }
 
@@ -735,9 +805,13 @@ public partial class MainWindow : Window
         _currentModerator = state.Moderator;
         _totalTime = TimeSpan.FromMinutes(state.DurationHours * 60 + state.DurationMinutes);
         _elapsed = TimeSpan.FromSeconds(state.ElapsedSeconds);
+        _lostTimeSeconds = state.LostTimeSeconds;
+        _pauseStartedAt = null;
         _isRunning = true;
         _isPaused = false;
-        
+        _milestoneBucket = -1;
+        _aiMilestoneMessage = null;
+
         var remainingOnResume = _totalTime - _elapsed;
         if (remainingOnResume.TotalSeconds <= 0)
         {

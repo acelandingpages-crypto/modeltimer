@@ -16,6 +16,7 @@ public class ShiftHistoryItem
     public int ElapsedHours { get; set; }
     public int ElapsedMinutes { get; set; }
     public int ElapsedSeconds { get; set; }
+    public int LostTimeSeconds { get; set; }
     public string SessionSummary { get; set; } = string.Empty;
     public string GoodMembers { get; set; } = string.Empty;
     public string IssuesToWatch { get; set; } = string.Empty;

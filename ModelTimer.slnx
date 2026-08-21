@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ModelTimer.csproj" />
+  <Project Path="ModelTimer.Tests/ModelTimer.Tests.csproj" />
+</Solution>
