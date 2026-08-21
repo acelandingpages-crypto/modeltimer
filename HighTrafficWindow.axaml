@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ModelTimer"
         x:Class="ModelTimer.HighTrafficWindow"
-        Title="High Traffic"
+        Title="Good Members"
         Width="900"
         Height="700"
         MinWidth="900"
@@ -18,7 +18,7 @@
       <Grid ColumnDefinitions="*,Auto,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="10,0,0,0">
           <TextBlock Text="👑" FontSize="16" VerticalAlignment="Center"/>
-          <TextBlock Text="High-Value Traffic &amp; CRM" Foreground="#FF000000" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+          <TextBlock Text="Good Members &amp; CRM" Foreground="#FF000000" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,5,0" ClipToBounds="False">
           <TextBlock Text="🔍" FontSize="12" VerticalAlignment="Center"/>

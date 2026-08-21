@@ -21,7 +21,7 @@
 
     <!-- Top Toolbar -->
     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
-      <Button Name="BtnHighTraffic" Content="High Traffic" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnHighTraffic_Click" IsTabStop="False" Focusable="False"/>
+      <Button Name="BtnHighTraffic" Content="Good Members" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnHighTraffic_Click" IsTabStop="False" Focusable="False"/>
       <Button Name="BtnShiftHistory" Content="Shift History" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnShiftHistory_Click" IsTabStop="False" Focusable="False"/>
       <Button Name="BtnActivity" Content="Activity" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnActivity_Click" IsTabStop="False" Focusable="False"/>
       <Button Name="BtnAsk" Content="Ask" Height="30" Background="#FF3E3E42" Foreground="White" Margin="0,0,10,0" Click="BtnAsk_Click" IsTabStop="False" Focusable="False"/>
