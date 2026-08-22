@@ -116,26 +116,42 @@ internal static class AiSummaryService
         return await SendAsync(settings, prompt, 512);
     }
 
-    public static async Task<string> GenerateMilestoneMessageAsync(AppSettings settings, string model, string moderator, TimeSpan elapsed, TimeSpan planned, double progressPercent)
+    /// <summary>Which of the three rotating milestone-message kinds to write. The caller picks this
+    /// deterministically (see MainWindow's bucket % 3) rather than letting the AI choose - each call
+    /// is stateless, so an unconstrained "pick whichever fits" instruction had no memory of what it
+    /// picked last time and could (and did) end up skipping a whole kind for an entire shift.</summary>
+    internal enum MilestoneMessageKind { Motivation, ModelCheckIn, CamshowTip }
+
+    public static async Task<string> GenerateMilestoneMessageAsync(AppSettings settings, string model, string moderator, TimeSpan elapsed, TimeSpan planned, double progressPercent, MilestoneMessageKind kind)
     {
+        var kindInstruction = kind switch
+        {
+            MilestoneMessageKind.Motivation =>
+                "Write a genuinely motivating line for someone this deep into a work shift - not generic " +
+                "corporate hype, a little playful or wry is good, but it should read like it actually " +
+                "understands what a long shift feels like.",
+            MilestoneMessageKind.ModelCheckIn =>
+                "Write a practical, low-key reminder for the moderator to check in on the model they're " +
+                "working with: is she doing okay, does she need anything (water, a break, backup), is there " +
+                "anything that would make the two of them working together easier right now.",
+            MilestoneMessageKind.CamshowTip =>
+                "Write a genuinely useful \"did you know\" tip for a camshow studio moderator - drawn from " +
+                "real camming know-how. Pick ONE of: site rules/compliance moderators should keep in mind, how " +
+                "to help the model talk with members in a way that keeps them engaged and spending, ways to " +
+                "attract more traffic/viewers to the room, or how to troubleshoot common technical issues " +
+                "(stream/audio/lag/connection problems). Keep it generic and sound, not specific to any one " +
+                "platform's exact rules.",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+
         var prompt =
             "You are writing a single short status line shown live on a content-moderation studio's shift timer " +
-            "while a moderator is actively working - it refreshes several times over the course of the shift. " +
-            "Write ONE short line that is ONE of the following three kinds - (a) a genuinely motivating line " +
-            "for someone this deep into a work shift - not generic corporate hype, a little playful or wry is " +
-            "good, but it should read like it actually understands what a long shift feels like; (b) a " +
-            "practical, low-key reminder for the moderator to check in on the model they're working with: is " +
-            "she doing okay, does she need anything (water, a break, backup), is there anything that would " +
-            "make the two of them working together easier right now; (c) a genuinely useful \"did you know\" " +
-            "tip for a camshow studio moderator - drawn from real camming know-how, e.g. site rules/compliance " +
-            "moderators should keep in mind, how to help the model talk with members in a way that keeps them " +
-            "engaged and spending, ways to attract more traffic/viewers to the room, or how to troubleshoot " +
-            "common technical issues (stream/audio/lag/connection problems). Keep tip content generic and " +
-            "sound, not specific to any one platform's exact rules. Rotate roughly evenly between the three " +
-            "kinds across a shift rather than favoring one. Keep it natural, specific, and low-key - never " +
-            "preachy or corporate. Under 45 characters if at all possible, longer only if a tip genuinely needs " +
-            "it (never more than 90 characters). You may lead with a single relevant emoji. Respond with ONLY " +
-            "the line itself - no quotes, no markdown, no explanation, nothing else.\n\n" +
+            "while a moderator is actively working - it refreshes several times over the course of the shift, " +
+            "each time asking for a different kind of line. Write ONE short line for THIS request. " +
+            kindInstruction + " Keep it natural, specific, and low-key - never preachy or corporate. Under 45 " +
+            "characters if at all possible, longer only if a tip genuinely needs it (never more than 90 " +
+            "characters). You may lead with a single relevant emoji. Respond with ONLY the line itself - no " +
+            "quotes, no markdown, no explanation, nothing else.\n\n" +
             $"Progress: {progressPercent:0}% through a planned {FormatClock(planned)} shift " +
             $"({FormatClock(elapsed)} worked so far) | Model: {model} | Moderator: {moderator}";
 

@@ -222,7 +222,11 @@ public partial class MainWindow : Window
         _isFetchingMilestone = true;
         try
         {
-            var message = await AiSummaryService.GenerateMilestoneMessageAsync(settings, _currentModel, _currentModerator, elapsedAtRequest, _totalTime, progressPercent);
+            // Cycle deterministically through the three message kinds by bucket index, rather than
+            // letting the AI pick - each call is stateless, so it has no memory of what kind it
+            // wrote last time and an unconstrained choice could end up skipping one kind entirely.
+            var kind = (AiSummaryService.MilestoneMessageKind)(((bucket % 3) + 3) % 3);
+            var message = await AiSummaryService.GenerateMilestoneMessageAsync(settings, _currentModel, _currentModerator, elapsedAtRequest, _totalTime, progressPercent, kind);
 
             // Only apply it if we're still on the same milestone and still running - a slow
             // response for a milestone we've already moved past (or a shift that already ended)
