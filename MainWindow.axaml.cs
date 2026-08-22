@@ -181,12 +181,18 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>Refreshes the on-timer status line. Every 10% of shift progress, it tries to have
-    /// AI write a fresh line for that milestone - alternating between motivation and practical
-    /// reminders to check in on the model (see AiSummaryService.GenerateMilestoneMessageAsync).
-    /// The deterministic message above is shown immediately and stays up if AI isn't set up,
-    /// hasn't been consented to yet (see AiConsentService - this runs automatically, so it must
-    /// never itself prompt for consent), or the request fails for any reason.</summary>
+    /// <summary>How often (in percentage points of shift progress) a fresh AI milestone line is
+    /// requested - three times per 10% of progress.</summary>
+    private const double MilestoneStepPercent = 10.0 / 3.0;
+
+    /// <summary>Refreshes the on-timer status line. Every <see cref="MilestoneStepPercent"/> of
+    /// shift progress, it tries to have AI write a fresh line for that milestone - rotating between
+    /// motivation, practical reminders to check in on the model, and camshow "did you know" tips
+    /// (site rules, talking with members, growing traffic, troubleshooting - see
+    /// AiSummaryService.GenerateMilestoneMessageAsync). The deterministic message above is shown
+    /// immediately and stays up if AI isn't set up, hasn't been consented to yet (see
+    /// AiConsentService - this runs automatically, so it must never itself prompt for consent), or
+    /// the request fails for any reason.</summary>
     private void UpdateMilestoneText(double progressPercent)
     {
         if (!_isRunning)
@@ -195,7 +201,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var bucket = (int)(progressPercent / 10);
+        var bucket = (int)(progressPercent / MilestoneStepPercent);
         if (bucket != _milestoneBucket)
         {
             _milestoneBucket = bucket;
